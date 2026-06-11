@@ -143,6 +143,19 @@
     }
     .channel.active .channel-indicator { background: #818cf8; box-shadow: 0 0 6px rgba(129,140,248,.4); }
     .channel-info { min-width: 0; flex: 1; }
+    .channel-epg {
+      font-size: 10px;
+      color: #52526e;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      transition: color .15s;
+    }
+    .channel-epg:hover { color: #818cf8; }
+    .channel-epg.has-epg { color: #6b7280; }
+    .channel-epg.has-epg:hover { color: #a5b4fc; }
     .channel-name {
       font-size: 13px;
       font-weight: 500;
@@ -401,6 +414,94 @@
     .player-wrapper.idle .player-overlay { opacity: 0; pointer-events: none; }
     .player-wrapper.idle:hover .player-overlay { opacity: 1; pointer-events: auto; }
 
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #11111a;
+      border: 1px solid #1e1e2e;
+      border-radius: 14px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 16px 0;
+    }
+    .modal-header img { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; }
+    .modal-header .modal-title { font-size: 15px; font-weight: 600; color: #e2e8f0; flex: 1; }
+    .modal-close {
+      background: none; border: none; color: #6b7280; font-size: 20px;
+      cursor: pointer; padding: 4px; line-height: 1;
+    }
+    .modal-close:hover { color: #e2e8f0; }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 16px;
+    }
+    .modal-body::-webkit-scrollbar { width: 5px; }
+    .modal-body::-webkit-scrollbar-track { background: transparent; }
+    .modal-body::-webkit-scrollbar-thumb { background: #22223a; border-radius: 4px; }
+
+    .epg-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid #1a1a26;
+    }
+    .epg-entry:last-child { border-bottom: none; }
+    .epg-entry.is-now { background: #1c1c30; margin: 0 -8px; padding: 8px; border-radius: 6px; border-bottom-color: transparent; }
+    .epg-time {
+      font-size: 11px;
+      color: #818cf8;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .epg-entry.is-now .epg-time { color: #a78bfa; }
+    .epg-title {
+      font-size: 13px;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+    .epg-desc {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 3px;
+      line-height: 1.4;
+      display: none;
+    }
+    .epg-entry.is-now .epg-title { color: #a5b4fc; }
+    .epg-desc.open { display: block; }
+    .epg-desc-toggle {
+      font-size: 10px;
+      color: #52526e;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 2px 0;
+      margin-top: 2px;
+    }
+    .epg-desc-toggle:hover { color: #818cf8; }
+    .epg-loading {
+      text-align: center;
+      padding: 32px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
     @media (max-width: 768px) {
       .menu-btn { display: block; }
       .header input { width: 140px; font-size: 13px; }
@@ -482,6 +583,19 @@
     <div class="now-playing" id="nowPlaying">
       <span>Reproduciendo: <span class="np-name" id="npName"></span></span>
       <span class="np-status"><span class="dot"></span>En vivo</span>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="epgModal">
+  <div class="modal">
+    <div class="modal-header">
+      <img id="modalLogo" src="" alt="" onerror="this.style.display='none'">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="modal-close" onclick="closeEPG()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="epg-loading">Cargando guía...</div>
     </div>
   </div>
 </div>
@@ -674,6 +788,68 @@ document.addEventListener('click', () => {
   document.getElementById('audioMenu').classList.remove('open');
 });
 
+// ---- EPG modal ----
+
+function formatEPGTime(timestr) {
+  const m = timestr.match(/\d{14}/);
+  if (!m) return timestr;
+  const s = m[0];
+  return s.substring(6, 8) + '/' + s.substring(4, 6) + ' ' + s.substring(8, 10) + ':' + s.substring(10, 12);
+}
+
+function shortEPGTime(timestr) {
+  const m = timestr.match(/\d{14}/);
+  if (!m) return timestr;
+  return m[0].substring(8, 10) + ':' + m[0].substring(10, 12);
+}
+
+function openEPG(channelId) {
+  const ch = channels.find(c => c.id === channelId);
+  if (!ch) return;
+  document.getElementById('modalTitle').textContent = ch.name;
+  const logo = document.getElementById('modalLogo');
+  if (ch.logo) { logo.src = ch.logo; logo.style.display = ''; }
+  else { logo.style.display = 'none'; }
+  document.getElementById('modalBody').innerHTML = '<div class="epg-loading">Cargando guía...</div>';
+  document.getElementById('epgModal').classList.add('open');
+
+  fetch('/api/epg/guide?channel=' + channelId)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.programmes || data.programmes.length === 0) {
+        document.getElementById('modalBody').innerHTML = '<div class="epg-loading" style="color:#52526e">No hay guía disponible para este canal</div>';
+        return;
+      }
+      let html = '';
+      data.programmes.forEach(p => {
+        const cls = p.is_now ? 'epg-entry is-now' : 'epg-entry';
+        const timeStr = formatEPGTime(p.start) + ' - ' + shortEPGTime(p.stop);
+        const nowLabel = p.is_now ? ' <span style="color:#22c55e;font-size:10px">● EN VIVO</span>' : '';
+        html += '<div class="' + cls + '">';
+        html += '<div class="epg-time">' + timeStr + nowLabel + '</div>';
+        html += '<div class="epg-title">' + (p.title || 'Sin título') + '</div>';
+        if (p.desc) {
+          const descId = 'epgDesc' + data.programmes.indexOf(p);
+          html += '<div class="epg-desc" id="' + descId + '">' + p.desc + '</div>';
+          html += '<button class="epg-desc-toggle" onclick="document.getElementById(\'' + descId + '\').classList.toggle(\'open\');this.textContent=this.textContent==\'▼ Más\'?\'▲ Menos\':\'▼ Más\'">▼ Más</button>';
+        }
+        html += '</div>';
+      });
+      document.getElementById('modalBody').innerHTML = html;
+    })
+    .catch(() => {
+      document.getElementById('modalBody').innerHTML = '<div class="epg-loading" style="color:#f87171">Error al cargar la guía</div>';
+    });
+}
+
+function closeEPG() {
+  document.getElementById('epgModal').classList.remove('open');
+}
+
+document.getElementById('epgModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('epgModal')) closeEPG();
+});
+
 // ---- channel logic ----
 
 function renderChannels(chs) {
@@ -701,6 +877,11 @@ function renderChannels(chs) {
       }
       html += `<div class="channel-indicator"></div>`;
       html += `<div class="channel-info"><div class="channel-name">${ch.name}</div>`;
+      if (ch.epg_now) {
+        html += `<div class="channel-epg has-epg" onclick="event.stopPropagation();openEPG('${ch.id}')">Ahora: ${ch.epg_now.title}</div>`;
+      } else {
+        html += `<div class="channel-epg">Sin guía</div>`;
+      }
       if (ch.variants.length > 1) {
         html += `<div class="channel-variants">`;
         ch.variants.forEach((v) => {

@@ -2,6 +2,8 @@ import os
 import re
 import json
 import time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 import requests
 from flask import Flask, Response, render_template, request, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -21,11 +23,16 @@ FALLBACK_SCRAPE_URL = os.environ.get(
     ""
 )
 
+EPG_URL = os.environ.get("EPG_URL", "")
+
 STATIC_CHANNELS_PATH = os.path.join(os.path.dirname(__file__), "channels.json")
 CACHE_TTL = 86400
+EPG_CACHE_TTL = int(os.environ.get("EPG_CACHE_TTL", "3600"))
 
 channels_cache = None
 channels_cache_time = 0
+epg_cache = None
+epg_cache_time = 0
 
 
 def parse_m3u(content):
@@ -54,6 +61,116 @@ def parse_m3u(content):
                     i += 1
         i += 1
     return items
+
+
+def parse_epg_time(timestr):
+    m = re.match(r'(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2}) ([+-]\d{2})(\d{2})', timestr)
+    if not m:
+        return None
+    offset_h = int(m.group(7))
+    offset_m = int(m.group(8))
+    if offset_h < 0:
+        offset_m = -offset_m
+    tz = timezone(timedelta(hours=offset_h, minutes=offset_m))
+    return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                    int(m.group(4)), int(m.group(5)), int(m.group(6)), tzinfo=tz)
+
+
+def fetch_epg():
+    global epg_cache, epg_cache_time
+    if not EPG_URL:
+        return {}
+    now = time.time()
+    if epg_cache and (now - epg_cache_time) < EPG_CACHE_TTL:
+        return epg_cache
+
+    try:
+        resp = requests.get(EPG_URL, timeout=30)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+    except Exception as e:
+        print(f"EPG fetch failed: {e}")
+        if epg_cache:
+            return epg_cache
+        return {}
+
+    epg_channels = {}
+    for ch in root.findall("channel"):
+        ch_id = ch.get("id", "")
+        display_names = [dn.text or "" for dn in ch.findall("display-name")]
+        epg_channels[ch_id] = display_names
+
+    now_dt = datetime.now(timezone.utc)
+
+    epg_data = {}
+    for prog in root.findall("programme"):
+        ch_id = prog.get("channel", "")
+        start_str = prog.get("start", "")
+        stop_str = prog.get("stop", "")
+        start_dt = parse_epg_time(start_str)
+        stop_dt = parse_epg_time(stop_str)
+        if not start_dt or not stop_dt:
+            continue
+        title_el = prog.find("title")
+        desc_el = prog.find("desc")
+        entry = {
+            "start": start_str,
+            "stop": stop_str,
+            "start_ts": start_dt.timestamp(),
+            "stop_ts": stop_dt.timestamp(),
+            "title": title_el.text if title_el is not None else "",
+            "desc": desc_el.text if desc_el is not None else "",
+        }
+        if ch_id not in epg_data:
+            epg_data[ch_id] = []
+        epg_data[ch_id].append(entry)
+
+    result = {
+        "channels": epg_channels,
+        "programmes": epg_data,
+    }
+    epg_cache = result
+    epg_cache_time = now
+    return result
+
+
+def clean_channel_name(name):
+    cleaned = re.sub(r'\s*\*+', '', name)
+    cleaned = re.sub(r'\s+\d+p', '', cleaned)
+    cleaned = re.sub(r'\s+(4K|UHD|FHD|HD|SD)$', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+\d+$', '', cleaned)
+    return cleaned.strip()
+
+
+def match_channel_to_epg(channel_name, epg_channels):
+    cleaned = clean_channel_name(channel_name).lower()
+    if not cleaned:
+        return None
+
+    for ch_id, display_names in epg_channels.items():
+        if clean_channel_name(ch_id).lower() == cleaned:
+            return ch_id
+        for dn in display_names:
+            if clean_channel_name(dn).lower() == cleaned:
+                return ch_id
+
+    for ch_id, display_names in epg_channels.items():
+        if cleaned in clean_channel_name(ch_id).lower():
+            return ch_id
+        for dn in display_names:
+            if cleaned in clean_channel_name(dn).lower():
+                return ch_id
+
+    return None
+
+
+def get_current_programme(ch_id, epg_data):
+    now_ts = time.time()
+    programmes = epg_data.get(ch_id, [])
+    for p in programmes:
+        if p["start_ts"] <= now_ts < p["stop_ts"]:
+            return p
+    return None
 
 
 def fetch_channels():
@@ -108,6 +225,10 @@ def fetch_channels():
             if v.get("hash"):
                 used_hashes.add(v["hash"])
 
+    epg_data = fetch_epg()
+    epg_channels_map = epg_data.get("channels", {})
+    epg_progs = epg_data.get("programmes", {})
+
     channels = []
     idx = 0
 
@@ -134,14 +255,35 @@ def fetch_channels():
                     logo = s["logo"]
                     break
 
-        channels.append({
+        channel_name = oc.get("name", variants[0]["title"])
+
+        ch = {
             "id": f"ch{idx}",
-            "name": oc.get("name", variants[0]["title"]),
+            "name": channel_name,
             "group": oc.get("group", "Otros"),
             "logo": logo,
             "variants": variants,
             "default_hash": variants[0]["hash"],
-        })
+        }
+
+        tvg_id = oc.get("tvg_id", "")
+        if tvg_id and tvg_id in epg_channels_map:
+            ch["epg_channel_id"] = tvg_id
+        else:
+            epg_match = match_channel_to_epg(channel_name, epg_channels_map)
+            if epg_match:
+                ch["epg_channel_id"] = epg_match
+
+        if ch.get("epg_channel_id") and ch["epg_channel_id"] in epg_progs:
+            current = get_current_programme(ch["epg_channel_id"], epg_progs)
+            if current:
+                ch["epg_now"] = {
+                    "title": current["title"],
+                    "start": current["start"],
+                    "stop": current["stop"],
+                }
+
+        channels.append(ch)
         idx += 1
 
     remaining = [item for item in scraped_items if item.get("hash") and item["hash"] not in used_hashes]
@@ -154,7 +296,7 @@ def fetch_channels():
             groups[group_name] = {}
         if channel_key not in groups[group_name]:
             groups[group_name][channel_key] = {
-                "name": channel_key, "logo": "", "variants": [],
+                "name": channel_key, "logo": "", "variants": [], "tvg_id": item.get("tvg_id", ""),
             }
         if item.get("logo"):
             groups[group_name][channel_key]["logo"] = item["logo"]
@@ -165,16 +307,34 @@ def fetch_channels():
 
     for group_name in sorted(groups.keys()):
         for ch_name in sorted(groups[group_name].keys()):
-            ch = groups[group_name][ch_name]
-            ch["variants"].sort(key=lambda v: quality_score(v["title"]), reverse=True)
-            channels.append({
+            ch_data = groups[group_name][ch_name]
+            ch_data["variants"].sort(key=lambda v: quality_score(v["title"]), reverse=True)
+            ch = {
                 "id": f"ch{idx}",
-                "name": ch["name"],
+                "name": ch_data["name"],
                 "group": group_name,
-                "logo": ch["logo"],
-                "variants": ch["variants"],
-                "default_hash": ch["variants"][0]["hash"],
-            })
+                "logo": ch_data["logo"],
+                "variants": ch_data["variants"],
+                "default_hash": ch_data["variants"][0]["hash"],
+            }
+            tvg_id = ch_data.get("tvg_id", "")
+            if tvg_id and tvg_id in epg_channels_map:
+                ch["epg_channel_id"] = tvg_id
+            else:
+                epg_match = match_channel_to_epg(ch_data["name"], epg_channels_map)
+                if epg_match:
+                    ch["epg_channel_id"] = epg_match
+
+            if ch.get("epg_channel_id") and ch["epg_channel_id"] in epg_progs:
+                current = get_current_programme(ch["epg_channel_id"], epg_progs)
+                if current:
+                    ch["epg_now"] = {
+                        "title": current["title"],
+                        "start": current["start"],
+                        "stop": current["stop"],
+                    }
+
+            channels.append(ch)
             idx += 1
 
     channels_cache = channels
@@ -198,6 +358,62 @@ def api_channels_refresh():
     channels_cache = None
     channels_cache_time = 0
     return jsonify(fetch_channels())
+
+
+@app.route("/api/epg/now")
+def api_epg_now():
+    epg_data = fetch_epg()
+    epg_progs = epg_data.get("programmes", {})
+    result = {}
+    for ch_id in epg_progs:
+        current = get_current_programme(ch_id, epg_progs)
+        if current:
+            result[ch_id] = {
+                "title": current["title"],
+                "start": current["start"],
+                "stop": current["stop"],
+            }
+    return jsonify(result)
+
+
+@app.route("/api/epg/guide")
+def api_epg_guide():
+    channel_id = request.args.get("channel", "")
+    if not channel_id:
+        return jsonify({"error": "Missing channel"}), 400
+
+    epg_data = fetch_epg()
+    epg_progs = epg_data.get("programmes", {})
+
+    channels = fetch_channels()
+    ch = next((c for c in channels if c["id"] == channel_id), None)
+    if not ch:
+        return jsonify({"error": "Channel not found"}), 404
+
+    epg_ch_id = ch.get("epg_channel_id")
+    if not epg_ch_id:
+        return jsonify({"channel": ch, "programmes": []})
+
+    programmes = epg_progs.get(epg_ch_id, [])
+    programmes.sort(key=lambda p: p["start_ts"])
+
+    now_ts = time.time()
+    result = []
+    for p in programmes:
+        result.append({
+            "title": p["title"],
+            "desc": p["desc"],
+            "start": p["start"],
+            "stop": p["stop"],
+            "start_ts": p["start_ts"],
+            "stop_ts": p["stop_ts"],
+            "is_now": p["start_ts"] <= now_ts < p["stop_ts"],
+        })
+
+    return jsonify({
+        "channel": ch,
+        "programmes": result,
+    })
 
 
 @app.route("/api/probe")
@@ -270,11 +486,8 @@ def proxy(path):
 
     if "mpegurl" in content_type or "m3u8" in content_type:
         text = resp.text
-        # Rewrite full http/https URLs to relative proxy paths
         text = re.sub(r'https?://[^/\s]+(/ace/)', r'/proxy/\1', text)
-        # Rewrite absolute paths starting with /ace/
         text = re.sub(r'(?m)^(?!\s*#)(?!\s*$)(/ace/)', r'/proxy/\1', text)
-        # Rewrite relative URLs (paths without leading / or #)
         text = re.sub(
             r'(?m)^(?!\s*#)(?!\s*$)(?!https?://)(?!\s*/)(\S+)$',
             r'/proxy/ace/\1',
