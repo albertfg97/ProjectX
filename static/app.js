@@ -13,6 +13,14 @@ let failoverTimer = null;
 let idleTimer = null;
 let currentUser = null;
 let isAdmin = false;
+let favorites = new Set(ls.get('favs', []));
+
+function saveFavs() { ls.set('favs', [...favorites]); }
+function toggleFav(chId) {
+  if (favorites.has(chId)) favorites.delete(chId); else favorites.add(chId);
+  saveFavs();
+  renderChannels($('#search').value ? channels.filter(c => c.name.toLowerCase().includes($('#search').value.toLowerCase()) || (c.group && c.group.toLowerCase().includes($('#search').value.toLowerCase()))) : channels);
+}
 
 function checkAuth() {
   fetch('/api/me')
@@ -189,65 +197,83 @@ function extractQuality(title) {
 }
 
 function renderChannels(chs) {
+  const favIds = new Set([...favorites].filter(id => chs.some(c => c.id === id)));
+  const favChs = chs.filter(c => favIds.has(c.id));
+  const otherChs = chs.filter(c => !favIds.has(c.id));
   const groups = {};
-  chs.forEach(c => {
+  otherChs.forEach(c => {
     const g = c.group || 'Other';
     if (!groups[g]) groups[g] = [];
     groups[g].push(c);
   });
   const sidebar = $('#sidebar');
   sidebar.innerHTML = '';
+  if (favChs.length) {
+    const div = document.createElement('div');
+    div.className = 'group';
+    div.innerHTML = '<div class="group-title">⭐ Favoritos</div>';
+    favChs.forEach(ch => renderChannelItem(div, ch));
+    sidebar.appendChild(div);
+  }
   Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).forEach(([g, chList]) => {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">' + g + '</div>';
-    chList.forEach(ch => {
-      const item = document.createElement('div');
-      item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
-      item.dataset.id = ch.id;
-      let html = '<div class="channel-row">';
-      if (ch.logo) html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
-      html += '<div class="channel-indicator"></div>';
-      html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
-      if (ch.epg_now) {
-        html += '<div class="channel-epg has-epg" data-epg="1">Ahora: ' + ch.epg_now.title + '</div>';
-      } else {
-        html += '<div class="channel-epg">Sin guía</div>';
-      }
-      if (ch.variants && ch.variants.length > 1) {
-        html += '<div class="channel-variants">';
-        ch.variants.forEach((v, idx) => {
-          const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
-          html += '<span class="variant-chip' + (active ? ' active' : '') + '" data-idx="' + idx + '">' + extractQuality(v.title) + '</span>';
-        });
-        html += '</div>';
-      }
-      html += '</div></div>';
-      item.innerHTML = html;
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.variant-chip')) return;
-        if (e.target.closest('.channel-epg[data-epg]')) return;
-        closeSidebar();
-        playHash(ch.id, ch.variants[0].hash);
-      });
-      item.querySelectorAll('.variant-chip').forEach((chip, idx) => {
-        chip.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeSidebar();
-          playHash(ch.id, ch.variants[parseInt(chip.dataset.idx)].hash);
-        });
-      });
-      const epgEl = item.querySelector('.channel-epg[data-epg]');
-      if (epgEl) {
-        epgEl.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openEPG(ch.id);
-        });
-      }
-      div.appendChild(item);
-    });
+    chList.forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   });
+}
+function renderChannelItem(container, ch) {
+  const item = document.createElement('div');
+  item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
+  item.dataset.id = ch.id;
+  const isFav = favorites.has(ch.id);
+  let html = '<div class="channel-row">';
+  html += '<span class="channel-fav" data-fav="1">' + (isFav ? '★' : '☆') + '</span>';
+  if (ch.logo) html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
+  html += '<div class="channel-indicator"></div>';
+  html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
+  if (ch.epg_now) {
+    html += '<div class="channel-epg has-epg" data-epg="1">Ahora: ' + ch.epg_now.title + '</div>';
+  } else {
+    html += '<div class="channel-epg">Sin guía</div>';
+  }
+  if (ch.variants && ch.variants.length > 1) {
+    html += '<div class="channel-variants">';
+    ch.variants.forEach((v, idx) => {
+      const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
+      html += '<span class="variant-chip' + (active ? ' active' : '') + '" data-idx="' + idx + '">' + extractQuality(v.title) + '</span>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  item.innerHTML = html;
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.variant-chip')) return;
+    if (e.target.closest('.channel-epg[data-epg]')) return;
+    if (e.target.closest('.channel-fav')) return;
+    closeSidebar();
+    playHash(ch.id, ch.variants[0].hash);
+  });
+  item.querySelector('.channel-fav').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFav(ch.id);
+  });
+  item.querySelectorAll('.variant-chip').forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSidebar();
+      playHash(ch.id, ch.variants[parseInt(chip.dataset.idx)].hash);
+    });
+  });
+  const epgEl = item.querySelector('.channel-epg[data-epg]');
+  if (epgEl) {
+    epgEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEPG(ch.id);
+    });
+  }
+  container.appendChild(item);
 }
 
 function closeSidebar() {
@@ -640,8 +666,6 @@ function initApp() {
             if (epgNow[ch.id]) ch.epg_now = epgNow[ch.id];
           });
           renderChannels(channels);
-          const first = $('#sidebar .channel');
-          if (first) first.click();
         })
         .catch(() => { renderChannels(channels); });
     })

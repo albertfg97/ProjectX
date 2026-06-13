@@ -125,6 +125,12 @@ button { font-family: inherit; }
 .channel:hover { background: #181824; }
 .channel.active { background: #1c1c30; }
 .channel-row { display: flex; align-items: center; gap: 8px; }
+.channel-fav {
+  font-size: 14px; cursor: pointer; flex-shrink: 0; width: 16px; text-align: center;
+  color: #52526e; transition: color .15s; user-select: none;
+}
+.channel-fav:hover { color: #fbbf24; }
+.channel.active .channel-fav { color: #fbbf24; }
 .channel-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0; }
 .channel-indicator {
   width: 7px; height: 7px;
