@@ -570,7 +570,8 @@ function initControls() {
   $('.progress-wrap').addEventListener('click', (e) => {
     if (!v.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    v.currentTime = ((e.clientX - rect.left) / rect.width) * v.duration;
+    const target = ((e.clientX - rect.left) / rect.width) * v.duration;
+    v.currentTime = Math.min(target, v.duration - 1);
   });
 
   const volumeRange = $('.volume-slider input');
