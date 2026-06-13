@@ -570,11 +570,7 @@ function initControls() {
     if (!v.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const target = ((e.clientX - rect.left) / rect.width) * v.duration;
-    if (target > v.currentTime) {
-      v.currentTime = v.duration - 1;
-    } else {
-      v.currentTime = Math.max(0, target);
-    }
+    v.currentTime = Math.min(target, v.duration - 1);
   });
 
   const volumeRange = $('.volume-slider input');
