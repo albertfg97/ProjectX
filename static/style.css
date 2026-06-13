@@ -393,12 +393,15 @@ button { font-family: inherit; }
   font-size: 10px;
   font-weight: 700;
   width: auto;
-  padding: 0 6px;
+  padding: 2px 8px;
+  border: 1.5px solid #f87171;
+  border-radius: 6px;
   color: #f87171;
   text-transform: uppercase;
   letter-spacing: .03em;
+  background: transparent;
 }
-.live-btn.at-live { color: #52526e; }
+.live-btn.at-live { border-color: #3a3a52; color: #52526e; }
 
 .now-playing {
   padding: 10px 20px;

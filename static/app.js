@@ -594,8 +594,8 @@ function initControls() {
   });
   function updateLiveBtn() {
     const liveBtn = $('.live-btn');
-    if (!video.duration) return;
-    const atLive = video.duration - video.currentTime < 5;
+    if (!v.duration) return;
+    const atLive = v.duration - v.currentTime < 5;
     liveBtn.classList.toggle('at-live', atLive);
   }
   v.addEventListener('timeupdate', updateLiveBtn);
