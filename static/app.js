@@ -556,8 +556,7 @@ function initControls() {
   });
   v.addEventListener('timeupdate', () => {
     if (!v.duration) return;
-    const pct = (v.currentTime / v.duration) * 100;
-    $('.progress-fill').style.width = pct + '%';
+    $('.progress-fill').style.width = '100%';
     $('.time-current').textContent = formatTime(v.currentTime);
   });
   v.addEventListener('loadedmetadata', () => {
@@ -571,7 +570,11 @@ function initControls() {
     if (!v.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const target = ((e.clientX - rect.left) / rect.width) * v.duration;
-    v.currentTime = Math.min(target, v.duration - 1);
+    if (target > v.currentTime) {
+      v.currentTime = v.duration - 1;
+    } else {
+      v.currentTime = Math.max(0, target);
+    }
   });
 
   const volumeRange = $('.volume-slider input');
@@ -635,7 +638,7 @@ function initControls() {
         break;
       case 'ArrowRight':
         e.preventDefault();
-        v.currentTime = Math.min(v.duration || 0, v.currentTime + 5);
+        v.currentTime = Math.min(v.duration - 1 || 0, v.currentTime + 5);
         break;
       case 'ArrowUp':
         e.preventDefault();
