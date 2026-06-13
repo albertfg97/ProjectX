@@ -4,1085 +4,119 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Acestream Web</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17/dist/hls.min.js"></script>
-  <style>
-    *, ::before, ::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0b0b0e;
-      color: #e2e8f0;
-      min-height: 100vh;
-    }
-    button { font-family: inherit; }
-
-    .header {
-      background: #111118;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      border-bottom: 1px solid #1e1e2a;
-      position: relative;
-      z-index: 10;
-    }
-    .header h1 {
-      font-size: 20px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #818cf8, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      white-space: nowrap;
-    }
-    .menu-btn {
-      display: none;
-      background: none;
-      border: none;
-      color: #a5b4fc;
-      font-size: 24px;
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
-    }
-    .header input {
-      background: #1a1a24;
-      border: 1px solid #2a2a3a;
-      color: #e2e8f0;
-      padding: 8px 14px;
-      border-radius: 10px;
-      width: 280px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color .2s, box-shadow .2s;
-      margin-left: auto;
-    }
-    .header input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.15); }
-    .header input::placeholder { color: #52526e; }
-
-    .app-layout {
-      display: flex;
-      height: calc(100vh - 55px);
-    }
-
-    .sidebar-outer {
-      width: 340px;
-      min-width: 340px;
-      background: #0f0f16;
-      border-right: 1px solid #1a1a26;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      z-index: 5;
-    }
-    .sidebar {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px 10px 4px;
-    }
-    .sidebar::-webkit-scrollbar { width: 5px; }
-    .sidebar::-webkit-scrollbar-track { background: transparent; }
-    .sidebar::-webkit-scrollbar-thumb { background: #22223a; border-radius: 4px; }
-    .sidebar-footer {
-      padding: 10px 12px;
-      border-top: 1px solid #1a1a26;
-    }
-    .refresh-btn {
-      width: 100%;
-      padding: 7px;
-      border: 1px solid #22223a;
-      border-radius: 8px;
-      background: #15151f;
-      color: #72728a;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all .15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    .refresh-btn:hover { border-color: #818cf8; color: #c7d2fe; background: #1a1a28; }
-    .refresh-btn:disabled { opacity: .5; cursor: wait; }
-
-    .sidebar-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.6);
-      z-index: 8;
-    }
-
-    .group { margin-bottom: 16px; }
-    .group-title {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: #52526e;
-      margin-bottom: 6px;
-      padding: 0 6px;
-    }
-    .channel {
-      padding: 5px 8px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background .12s;
-      margin-bottom: 1px;
-    }
-    .channel:hover { background: #181824; }
-    .channel.active { background: #1c1c30; }
-    .channel-row { display: flex; align-items: center; gap: 8px; }
-    .channel-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0; }
-    .channel-indicator {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #28283e;
-      flex-shrink: 0;
-      transition: background .2s;
-    }
-    .channel.active .channel-indicator { background: #818cf8; box-shadow: 0 0 6px rgba(129,140,248,.4); }
-    .channel-info { min-width: 0; flex: 1; }
-    .channel-epg {
-      font-size: 10px;
-      color: #52526e;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      cursor: pointer;
-      transition: color .15s;
-    }
-    .channel-epg:hover { color: #818cf8; }
-    .channel-epg.has-epg { color: #6b7280; }
-    .channel-epg.has-epg:hover { color: #a5b4fc; }
-    .channel-name {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .channel.active .channel-name { color: #a5b4fc; }
-    .channel-variants { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
-    .variant-chip {
-      font-size: 9px; font-weight: 500; padding: 2px 6px; border-radius: 4px;
-      background: #181824; color: #5a5a78; cursor: pointer; transition: all .12s;
-    }
-    .variant-chip:hover { background: #22223a; color: #a5b4fc; }
-    .variant-chip.active { background: #4f46e5; color: #e0e7ff; }
-
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #08080b;
-      min-width: 0;
-    }
-    .player-wrapper {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px;
-      position: relative;
-      overflow: hidden;
-      background: #000;
-      margin: 6px;
-      border-radius: 10px;
-    }
-    .player-wrapper video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
-      display: none;
-    }
-    .player-placeholder {
-      text-align: center;
-      color: #3a3a52;
-    }
-    .player-placeholder .icon {
-      font-size: 44px;
-      margin-bottom: 10px;
-      opacity: .25;
-    }
-    .player-placeholder p { font-size: 13px; font-weight: 500; }
-
-    .player-state {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      text-align: center;
-      margin: auto;
-      padding: 24px;
-      max-width: 320px;
-      z-index: 2;
-    }
-    .player-state .state-icon { font-size: 32px; line-height: 1; }
-    .player-state .state-msg { font-size: 13px; font-weight: 500; }
-    .player-state .state-sub { font-size: 11px; color: #52526e; margin-top: -4px; }
-    .player-state.error .state-icon { color: #f87171; }
-    .player-state.error .state-msg { color: #fca5a5; }
-    .player-state.loading .state-icon { color: #818cf8; }
-    .player-state.loading .state-msg { color: #9ca3af; }
-    .spinner-sm {
-      width: 28px; height: 28px;
-      border: 3px solid #1e1e2e;
-      border-top-color: #818cf8;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .player-overlay {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      z-index: 3;
-      opacity: 0;
-      transition: opacity .3s;
-      pointer-events: none;
-    }
-    .player-overlay.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .controls-bg {
-      background: linear-gradient(transparent, rgba(0,0,0,.85));
-      padding: 32px 16px 12px;
-    }
-    .controls-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .ctrl-btn {
-      background: none;
-      border: none;
-      color: #e2e8f0;
-      font-size: 18px;
-      cursor: pointer;
-      padding: 4px;
-      line-height: 1;
-      opacity: .8;
-      transition: opacity .15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px; height: 32px;
-    }
-    .ctrl-btn:hover { opacity: 1; }
-    .ctrl-btn:disabled { cursor: default; }
-    .ctrl-btn.small { font-size: 14px; width: 28px; height: 28px; }
-
-    .progress-wrap {
-      flex: 1;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      position: relative;
-    }
-    .progress-track {
-      width: 100%;
-      height: 4px;
-      background: rgba(255,255,255,.2);
-      border-radius: 2px;
-      position: relative;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: #818cf8;
-      border-radius: 2px;
-      width: 0%;
-      transition: width .1s linear;
-    }
-    .progress-wrap:hover .progress-track { height: 6px; }
-    .progress-wrap:hover .progress-fill { border-radius: 3px; }
-    .progress-thumb {
-      position: absolute;
-      top: 50%;
-      width: 12px; height: 12px;
-      background: #e2e8f0;
-      border-radius: 50%;
-      transform: translate(-50%, -50%) scale(0);
-      transition: transform .15s;
-    }
-    .progress-wrap:hover .progress-thumb { transform: translate(-50%, -50%) scale(1); }
-
-    .time-display {
-      font-size: 12px;
-      color: #94a3b8;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-      min-width: 36px;
-    }
-    .time-sep { color: #475569; margin: 0 2px; }
-
-    .volume-wrap {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .volume-slider {
-      width: 60px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-    }
-    .volume-slider input[type=range] {
-      width: 60px;
-      height: 3px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: rgba(255,255,255,.25);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    .volume-slider input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #e2e8f0;
-      cursor: pointer;
-    }
-
-    .audio-btn {
-      position: relative;
-    }
-    .audio-btn .audio-label {
-      font-size: 10px;
-      background: #1e1e30;
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: #94a3b8;
-      margin-left: 2px;
-    }
-    .audio-menu {
-      position: absolute;
-      bottom: 100%;
-      right: 0;
-      background: #1a1a28;
-      border: 1px solid #2a2a3e;
-      border-radius: 8px;
-      padding: 4px;
-      display: none;
-      min-width: 140px;
-      margin-bottom: 8px;
-    }
-    .audio-menu.open { display: block; }
-    .audio-menu-item {
-      padding: 6px 10px;
-      font-size: 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      color: #94a3b8;
-    }
-    .audio-menu-item:hover { background: #2a2a3e; }
-    .audio-menu-item.active { color: #a5b4fc; background: #2a2a4e; }
-
-    .full-btn { font-size: 16px; }
-
-    .now-playing {
-      padding: 10px 20px;
-      background: #111118;
-      border-top: 1px solid #1a1a26;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      gap: 12px;
-    }
-    .now-playing .np-name { color: #a5b4fc; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .now-playing .np-status { color: #6b7280; font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .now-playing .np-status .dot {
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.4); }
-      50% { opacity: .6; box-shadow: 0 0 6px 2px rgba(34,197,94,.2); }
-    }
-
-    .player-wrapper:hover .player-overlay,
-    .player-wrapper.controls-shown .player-overlay { opacity: 1; pointer-events: auto; }
-    .player-wrapper.idle .player-overlay { opacity: 0; pointer-events: none; }
-    .player-wrapper.idle:hover .player-overlay { opacity: 1; pointer-events: auto; }
-
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.7);
-      z-index: 50;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: #11111a;
-      border: 1px solid #1e1e2e;
-      border-radius: 14px;
-      width: 100%;
-      max-width: 520px;
-      max-height: 85vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .modal-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 16px 16px 0;
-    }
-    .modal-header img { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; }
-    .modal-header .modal-title { font-size: 15px; font-weight: 600; color: #e2e8f0; flex: 1; }
-    .modal-close {
-      background: none; border: none; color: #6b7280; font-size: 20px;
-      cursor: pointer; padding: 4px; line-height: 1;
-    }
-    .modal-close:hover { color: #e2e8f0; }
-    .modal-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px 16px 16px;
-    }
-    .modal-body::-webkit-scrollbar { width: 5px; }
-    .modal-body::-webkit-scrollbar-track { background: transparent; }
-    .modal-body::-webkit-scrollbar-thumb { background: #22223a; border-radius: 4px; }
-
-    .epg-entry {
-      padding: 8px 0;
-      border-bottom: 1px solid #1a1a26;
-    }
-    .epg-entry:last-child { border-bottom: none; }
-    .epg-entry.is-now { background: #1c1c30; margin: 0 -8px; padding: 8px; border-radius: 6px; border-bottom-color: transparent; }
-    .epg-time {
-      font-size: 11px;
-      color: #818cf8;
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-    .epg-entry.is-now .epg-time { color: #a78bfa; }
-    .epg-title {
-      font-size: 13px;
-      color: #e2e8f0;
-      font-weight: 500;
-    }
-    .epg-desc {
-      font-size: 11px;
-      color: #6b7280;
-      margin-top: 3px;
-      line-height: 1.4;
-      display: none;
-    }
-    .epg-entry.is-now .epg-title { color: #a5b4fc; }
-    .epg-desc.open { display: block; }
-    .epg-desc-toggle {
-      font-size: 10px;
-      color: #52526e;
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 2px 0;
-      margin-top: 2px;
-    }
-    .epg-desc-toggle:hover { color: #818cf8; }
-    .epg-loading {
-      text-align: center;
-      padding: 32px;
-      color: #6b7280;
-      font-size: 13px;
-    }
-
-    @media (max-width: 768px) {
-      .menu-btn { display: block; }
-      .header input { width: 140px; font-size: 13px; }
-      .sidebar-outer {
-        position: fixed;
-        top: 55px; left: 0; bottom: 0;
-        width: 300px;
-        min-width: 0;
-        z-index: 20;
-        transform: translateX(-100%);
-        transition: transform .25s ease;
-        border-right: none;
-        border-radius: 0 12px 0 0;
-      }
-      .sidebar-outer.open { transform: translateX(0); }
-      .sidebar-backdrop.open { display: block; }
-      .player-wrapper { margin: 4px; border-radius: 8px; }
-      .time-display { font-size: 11px; min-width: 30px; }
-      .ctrl-btn { width: 28px; height: 28px; font-size: 16px; }
-    }
-  </style>
 </head>
 <body>
 
-<div class="header">
-  <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
-  <h1>Acestream Web</h1>
-  <input type="text" id="search" placeholder="Buscar canales..." oninput="filterChannels()">
+<div class="login-overlay" id="login-overlay">
+  <div class="login-modal">
+    <h2>Acestream Web</h2>
+    <p>Inicia sesión para continuar</p>
+    <form id="login-form">
+      <input type="text" id="login-user" placeholder="Usuario" autocomplete="username">
+      <input type="password" id="login-pass" placeholder="Contraseña" autocomplete="current-password">
+      <button class="login-btn" type="submit">Iniciar sesión</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
 </div>
 
-<div class="app-layout">
-  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
-  <div class="sidebar-outer" id="sidebarOuter">
-    <div class="sidebar" id="channelList"></div>
+<div class="header">
+  <button class="menu-btn">☰</button>
+  <h1>Acestream Web</h1>
+  <input type="text" id="search" placeholder="Buscar canales...">
+  <div class="header-right">
+    <div id="admin-btn-wrap" style="display:none">
+      <button class="admin-btn" id="admin-btn">Admin</button>
+    </div>
+    <span class="user-name" id="user-span"></span>
+    <div id="logout-btn-wrap" style="display:none">
+      <button class="logout-btn" id="logout-btn">Salir</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-content hidden">
+  <div class="sidebar-backdrop"></div>
+  <div class="sidebar-outer">
+    <div class="sidebar" id="sidebar"></div>
     <div class="sidebar-footer">
-      <button class="refresh-btn" id="refreshBtn" onclick="refreshChannels()">↻ Actualizar canales</button>
+      <button class="refresh-btn">↻ Refresh Channels</button>
     </div>
   </div>
   <div class="main">
-    <div class="player-wrapper" id="playerWrapper">
-      <div class="player-placeholder" id="placeholder">
+    <div class="player-wrapper" id="player-wrapper">
+      <div class="player-placeholder">
         <div class="icon">&#9654;</div>
         <p>Selecciona un canal para comenzar</p>
       </div>
-      <div class="player-state" id="playerState">
-        <div class="state-icon" id="stateIcon"></div>
-        <div class="state-msg" id="stateMsg"></div>
-        <div class="state-sub" id="stateSub"></div>
+      <div class="player-state">
+        <div class="state-icon"></div>
+        <div class="state-msg"></div>
+        <div class="state-sub"></div>
       </div>
-      <video id="videoPlayer"></video>
-      <div class="player-overlay" id="playerOverlay">
+      <video id="player-video"></video>
+      <div class="player-overlay">
         <div class="controls-bg">
           <div class="controls-row">
-            <button class="ctrl-btn" id="playBtn">▶</button>
-            <span class="time-display" id="currentTime">0:00</span>
+            <button class="ctrl-btn play-toggle">▶</button>
+            <span class="time-display time-current">0:00</span>
             <span class="time-sep">/</span>
-            <span class="time-display" id="duration">0:00</span>
-            <div class="progress-wrap" id="progressWrap">
+            <span class="time-display time-duration">0:00</span>
+            <div class="progress-wrap">
               <div class="progress-track">
-                <div class="progress-fill" id="progressFill"></div>
-                <div class="progress-thumb" id="progressThumb"></div>
+                <div class="progress-fill"></div>
+                <div class="progress-thumb"></div>
               </div>
             </div>
             <div class="volume-wrap">
-              <button class="ctrl-btn small" id="muteBtn">🔊</button>
-              <div class="volume-slider" id="volumeSlider">
-                <input type="range" id="volumeRange" min="0" max="1" step="0.05" value="1">
+              <button class="ctrl-btn small mute-toggle">🔊</button>
+              <div class="volume-slider">
+                <input type="range" min="0" max="1" step="0.05" value="1">
               </div>
             </div>
-            <div class="audio-btn" id="audioBtnWrap">
-              <button class="ctrl-btn small audio-btn-toggle" id="audioBtn">🎵<span class="audio-label" id="audioLabel">1</span></button>
-              <div class="audio-menu" id="audioMenu"></div>
+            <div class="audio-btn">
+              <button class="ctrl-btn small">🎵<span class="audio-label">1</span></button>
+              <div class="audio-menu"></div>
             </div>
-            <button class="ctrl-btn full-btn" id="fullBtn">⛶</button>
+            <button class="ctrl-btn full-btn">⛶</button>
           </div>
         </div>
       </div>
     </div>
-    <div class="now-playing" id="nowPlaying">
-      <span>Reproduciendo: <span class="np-name" id="npName"></span></span>
-      <span class="np-status"><span class="dot"></span>En vivo</span>
+    <div class="now-playing">
+      <span>Reproduciendo: <span class="np-name" id="np-name"></span></span>
+      <span class="np-status"><span class="dot"></span>En vivo <span class="np-quality"></span></span>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="epgModal">
+<div class="modal-overlay" id="epg-modal">
   <div class="modal">
     <div class="modal-header">
-      <img id="modalLogo" src="" alt="" onerror="this.style.display='none'">
-      <span class="modal-title" id="modalTitle"></span>
-      <button class="modal-close" onclick="closeEPG()">✕</button>
+      <img id="epg-modal-logo" src="" alt="" onerror="this.style.display='none'">
+      <span class="modal-title" id="epg-modal-title"></span>
+      <button class="modal-close">✕</button>
     </div>
-    <div class="modal-body" id="modalBody">
-      <div class="epg-loading">Cargando guía...</div>
+    <div class="modal-body" id="epg-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="admin-panel">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <span class="modal-title">Panel de Administración</span>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="admin-section" id="admin-users"></div>
+      <div class="admin-msg" id="admin-msg"></div>
+      <div class="admin-section" id="admin-active"></div>
     </div>
   </div>
 </div>
 
-<script>
-let channels = [];
-let hls = null;
-let currentHash = null;
-let currentChannel = null;
-let failoverTimer = null;
-let idleTimer = null;
-
-function toggleSidebar() {
-  document.getElementById('sidebarOuter').classList.toggle('open');
-  document.getElementById('sidebarBackdrop').classList.toggle('open');
-}
-function closeSidebar() {
-  document.getElementById('sidebarOuter').classList.remove('open');
-  document.getElementById('sidebarBackdrop').classList.remove('open');
-}
-
-function setPlayerState(mode, msg, sub) {
-  const el = document.getElementById('playerState');
-  const icon = document.getElementById('stateIcon');
-  const msgEl = document.getElementById('stateMsg');
-  const subEl = document.getElementById('stateSub');
-  document.getElementById('placeholder').style.display = 'none';
-  const video = document.getElementById('videoPlayer');
-  video.style.display = 'none';
-  document.getElementById('playerOverlay').style.display = 'none';
-  el.style.display = 'flex';
-  el.className = 'player-state ' + mode;
-  if (mode === 'loading') {
-    icon.innerHTML = '<div class="spinner-sm"></div>';
-    msgEl.textContent = msg || 'Cargando stream...';
-  } else if (mode === 'error') {
-    icon.textContent = '⚠';
-    msgEl.textContent = msg || 'Error al cargar el stream';
-    subEl.textContent = sub || 'Selecciona otro canal o actualiza la lista';
-  } else {
-    el.style.display = 'none';
-  }
-}
-
-function showControls() {
-  const pw = document.getElementById('playerWrapper');
-  pw.classList.remove('idle');
-  pw.classList.add('controls-shown');
-  clearTimeout(idleTimer);
-}
-function hideControls() {
-  const v = document.getElementById('videoPlayer');
-  if (v.paused) return;
-  document.getElementById('playerWrapper').classList.add('idle');
-  document.getElementById('playerWrapper').classList.remove('controls-shown');
-}
-function resetIdleTimer() {
-  showControls();
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(hideControls, 3000);
-}
-
-function formatTime(s) {
-  if (!isFinite(s) || s < 0) return '0:00';
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return m + ':' + (sec < 10 ? '0' : '') + sec;
-}
-
-function updatePlayBtn() {
-  const v = document.getElementById('videoPlayer');
-  document.getElementById('playBtn').textContent = v.paused ? '▶' : '⏸';
-}
-
-function updateProgress() {
-  const v = document.getElementById('videoPlayer');
-  if (!v.duration) return;
-  const pct = (v.currentTime / v.duration) * 100;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('currentTime').textContent = formatTime(v.currentTime);
-}
-
-function updateDuration() {
-  const v = document.getElementById('videoPlayer');
-  document.getElementById('duration').textContent = formatTime(v.duration);
-}
-
-function updateVolumeUI() {
-  const v = document.getElementById('videoPlayer');
-  const icon = document.getElementById('muteBtn');
-  if (v.muted || v.volume === 0) {
-    icon.textContent = '🔇';
-  } else if (v.volume < 0.5) {
-    icon.textContent = '🔉';
-  } else {
-    icon.textContent = '🔊';
-  }
-  document.getElementById('volumeRange').value = v.muted ? 0 : v.volume;
-}
-
-function initControls() {
-  const v = document.getElementById('videoPlayer');
-  const pw = document.getElementById('playerWrapper');
-
-  document.getElementById('playBtn').onclick = () => {
-    if (v.paused) v.play().catch(() => {}); else v.pause();
-  };
-  v.addEventListener('play', () => {
-    updatePlayBtn();
-    resetIdleTimer();
-  });
-  v.addEventListener('pause', () => {
-    updatePlayBtn();
-    showControls();
-  });
-  v.addEventListener('timeupdate', updateProgress);
-  v.addEventListener('loadedmetadata', updateDuration);
-  v.addEventListener('volumechange', updateVolumeUI);
-  v.addEventListener('durationchange', updateDuration);
-
-  const progressWrap = document.getElementById('progressWrap');
-  progressWrap.addEventListener('click', (e) => {
-    if (!v.duration) return;
-    const rect = progressWrap.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    v.currentTime = pct * v.duration;
-  });
-
-  document.getElementById('muteBtn').onclick = () => {
-    v.muted = !v.muted;
-    updateVolumeUI();
-  };
-  document.getElementById('volumeRange').addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    v.muted = val === 0;
-    v.volume = val;
-    updateVolumeUI();
-  });
-
-  document.getElementById('fullBtn').onclick = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      pw.requestFullscreen();
-    }
-  };
-  document.addEventListener('fullscreenchange', () => {
-    document.getElementById('fullBtn').textContent = document.fullscreenElement ? '⛶' : '⛶';
-  });
-
-  pw.addEventListener('mousemove', resetIdleTimer);
-  pw.addEventListener('touchstart', resetIdleTimer);
-  pw.addEventListener('click', resetIdleTimer);
-}
-
-function buildAudioMenu() {
-  const wrap = document.getElementById('audioBtnWrap');
-  const btn = document.getElementById('audioBtn');
-  const menu = document.getElementById('audioMenu');
-  const label = document.getElementById('audioLabel');
-  const hasMulti = hls && hls.audioTracks && hls.audioTracks.length > 1;
-  btn.disabled = !hasMulti;
-  btn.style.opacity = hasMulti ? '1' : '.35';
-  if (!hasMulti) {
-    menu.classList.remove('open');
-    label.textContent = '1';
-    return;
-  }
-  menu.innerHTML = '';
-  hls.audioTracks.forEach((t, idx) => {
-    const item = document.createElement('div');
-    item.className = 'audio-menu-item' + (idx === hls.audioTrack ? ' active' : '');
-    item.textContent = t.name || t.lang || 'Track ' + (idx + 1);
-    item.onclick = () => {
-      hls.audioTrack = idx;
-      menu.classList.remove('open');
-    };
-    menu.appendChild(item);
-  });
-  const activeIdx = hls.audioTrack;
-  label.textContent = (hls.audioTracks[activeIdx] && hls.audioTracks[activeIdx].name) || (activeIdx + 1);
-}
-
-document.getElementById('audioBtn').addEventListener('click', (e) => {
-  if (document.getElementById('audioBtn').disabled) return;
-  e.stopPropagation();
-  document.getElementById('audioMenu').classList.toggle('open');
-});
-document.addEventListener('click', () => {
-  document.getElementById('audioMenu').classList.remove('open');
-});
-
-// ---- EPG modal ----
-
-function formatEPGTime(timestr) {
-  const m = timestr.match(/\d{14}/);
-  if (!m) return timestr;
-  const s = m[0];
-  return s.substring(6, 8) + '/' + s.substring(4, 6) + ' ' + s.substring(8, 10) + ':' + s.substring(10, 12);
-}
-
-function shortEPGTime(timestr) {
-  const m = timestr.match(/\d{14}/);
-  if (!m) return timestr;
-  return m[0].substring(8, 10) + ':' + m[0].substring(10, 12);
-}
-
-function openEPG(channelId) {
-  const ch = channels.find(c => c.id === channelId);
-  if (!ch) return;
-  document.getElementById('modalTitle').textContent = ch.name;
-  const logo = document.getElementById('modalLogo');
-  if (ch.logo) { logo.src = ch.logo; logo.style.display = ''; }
-  else { logo.style.display = 'none'; }
-  document.getElementById('modalBody').innerHTML = '<div class="epg-loading">Cargando guía...</div>';
-  document.getElementById('epgModal').classList.add('open');
-
-  fetch('/api/epg/guide?channel=' + channelId)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.programmes || data.programmes.length === 0) {
-        document.getElementById('modalBody').innerHTML = '<div class="epg-loading" style="color:#52526e">No hay guía disponible para este canal</div>';
-        return;
-      }
-      let html = '';
-      data.programmes.forEach(p => {
-        const cls = p.is_now ? 'epg-entry is-now' : 'epg-entry';
-        const timeStr = formatEPGTime(p.start) + ' - ' + shortEPGTime(p.stop);
-        const nowLabel = p.is_now ? ' <span style="color:#22c55e;font-size:10px">● EN VIVO</span>' : '';
-        html += '<div class="' + cls + '">';
-        html += '<div class="epg-time">' + timeStr + nowLabel + '</div>';
-        html += '<div class="epg-title">' + (p.title || 'Sin título') + '</div>';
-        if (p.desc) {
-          const descId = 'epgDesc' + data.programmes.indexOf(p);
-          html += '<div class="epg-desc" id="' + descId + '">' + p.desc + '</div>';
-          html += '<button class="epg-desc-toggle" onclick="document.getElementById(\'' + descId + '\').classList.toggle(\'open\');this.textContent=this.textContent==\'▼ Más\'?\'▲ Menos\':\'▼ Más\'">▼ Más</button>';
-        }
-        html += '</div>';
-      });
-      document.getElementById('modalBody').innerHTML = html;
-    })
-    .catch(() => {
-      document.getElementById('modalBody').innerHTML = '<div class="epg-loading" style="color:#f87171">Error al cargar la guía</div>';
-    });
-}
-
-function closeEPG() {
-  document.getElementById('epgModal').classList.remove('open');
-}
-
-document.getElementById('epgModal').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('epgModal')) closeEPG();
-});
-
-// ---- channel logic ----
-
-function renderChannels(chs) {
-  const groups = {};
-  chs.forEach(c => {
-    const g = c.group || 'Otros';
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(c);
-  });
-
-  const container = document.getElementById('channelList');
-  container.innerHTML = '';
-  Object.entries(groups).forEach(([groupName, chList]) => {
-    const div = document.createElement('div');
-    div.className = 'group';
-    div.innerHTML = `<div class="group-title">${groupName}</div>`;
-    chList.forEach(ch => {
-      const item = document.createElement('div');
-      item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
-      item.dataset.id = ch.id;
-
-      let html = '<div class="channel-row">';
-      if (ch.logo) {
-        html += `<img class="channel-logo" src="${ch.logo}" alt="" onerror="this.style.display='none'">`;
-      }
-      html += `<div class="channel-indicator"></div>`;
-      html += `<div class="channel-info"><div class="channel-name">${ch.name}</div>`;
-      if (ch.epg_now) {
-        html += `<div class="channel-epg has-epg" onclick="event.stopPropagation();openEPG('${ch.id}')">Ahora: ${ch.epg_now.title}</div>`;
-      } else {
-        html += `<div class="channel-epg">Sin guía</div>`;
-      }
-      if (ch.variants.length > 1) {
-        html += `<div class="channel-variants">`;
-        ch.variants.forEach((v) => {
-          const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
-          const label = (v.title.match(/\d+p|4K|HD|FHD|UHD/i) || ['HD'])[0];
-          html += `<span class="variant-chip${active ? ' active' : ''}" data-hash="${v.hash}" onclick="event.stopPropagation();playHash('${ch.id}','${v.hash}')">${label}</span>`;
-        });
-        html += `</div>`;
-      }
-      html += `</div></div>`;
-      item.innerHTML = html;
-      item.onclick = () => {
-        closeSidebar();
-        playHash(ch.id, ch.variants[0].hash);
-      };
-      div.appendChild(item);
-    });
-    container.appendChild(div);
-  });
-}
-
-function filterChannels() {
-  const q = document.getElementById('search').value.toLowerCase();
-  const filtered = q ? channels.filter(c =>
-    c.name.toLowerCase().includes(q) ||
-    (c.group && c.group.toLowerCase().includes(q))
-  ) : channels;
-  renderChannels(filtered);
-}
-
-function refreshChannels() {
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = true;
-  btn.innerHTML = '⟳ Actualizando...';
-  fetch('/api/channels/refresh')
-    .then(r => r.json())
-    .then(data => {
-      channels = data;
-      renderChannels(channels);
-      btn.innerHTML = '↻ Actualizar canales';
-      btn.disabled = false;
-    })
-    .catch(() => {
-      btn.innerHTML = '↻ Error al actualizar';
-      btn.disabled = false;
-    });
-}
-
-function playHash(channelId, hash) {
-  const ch = channels.find(c => c.id === channelId);
-  if (!ch) return;
-  if (currentHash === hash) return;
-  currentHash = hash;
-  currentChannel = ch;
-
-  const variant = ch.variants.find(v => v.hash === hash) || ch.variants[0];
-  const qual = (variant.title.match(/\d+p|4K|UHD/i) || [''])[0];
-  document.getElementById('npName').textContent = ch.name + (qual ? ' — ' + qual : '');
-
-  const startIdx = ch.variants.findIndex(v => v.hash === hash);
-  tryVariant(ch, startIdx >= 0 ? startIdx : 0);
-}
-
-function tryVariant(ch, variantIdx) {
-  if (variantIdx >= ch.variants.length) {
-    setPlayerState('error', 'No se pudo cargar el stream',
-      'Probamos todas las calidades sin éxito. El canal puede estar caído.');
-    return;
-  }
-
-  const video = document.getElementById('videoPlayer');
-  const placeholder = document.getElementById('placeholder');
-  const nowPlaying = document.getElementById('nowPlaying');
-  const pw = document.getElementById('playerWrapper');
-  const hash = ch.variants[variantIdx].hash;
-  const variant = ch.variants[variantIdx];
-  const qual = (variant.title.match(/\d+p|4K|UHD/i) || ['HD'])[0];
-
-  if (hls) { hls.destroy(); hls = null; }
-  video.style.display = 'none';
-  document.getElementById('playerOverlay').style.display = 'none';
-  placeholder.style.display = 'none';
-  nowPlaying.style.display = 'none';
-  pw.classList.remove('idle', 'controls-shown');
-  clearTimeout(idleTimer);
-
-  currentHash = hash;
-
-  setPlayerState('loading', `Probando ${qual}...`);
-
-  if (failoverTimer) clearTimeout(failoverTimer);
-  failoverTimer = setTimeout(() => {
-    failoverTimer = null;
-    tryVariant(ch, variantIdx + 1);
-  }, 20000);
-
-  fetch(`/api/probe?hash=${hash}`)
-    .then(r => r.json())
-    .then(probe => {
-      if (probe.status !== 'ok') {
-        if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-        tryVariant(ch, variantIdx + 1);
-        return;
-      }
-      startPlayback(ch, variantIdx);
-    })
-    .catch(() => {
-      if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-      tryVariant(ch, variantIdx + 1);
-    });
-}
-
-function startPlayback(ch, variantIdx) {
-  const video = document.getElementById('videoPlayer');
-  const placeholder = document.getElementById('placeholder');
-  const nowPlaying = document.getElementById('nowPlaying');
-  const pw = document.getElementById('playerWrapper');
-  const hash = ch.variants[variantIdx].hash;
-  const variant = ch.variants[variantIdx];
-  const qual = (variant.title.match(/\d+p|4K|UHD/i) || ['HD'])[0];
-
-  setPlayerState('loading', `Conectando... ${qual}`);
-
-  if (failoverTimer) clearTimeout(failoverTimer);
-  failoverTimer = setTimeout(() => {
-    failoverTimer = null;
-    tryVariant(ch, variantIdx + 1);
-  }, 20000);
-
-  fetch(`/api/play?hash=${hash}`)
-    .then(r => r.json())
-    .then(data => {
-      renderChannels(channels);
-
-      if (Hls.isSupported()) {
-        hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          fragLoadingTimeOut: 30000,
-          manifestLoadingTimeOut: 30000,
-        });
-        hls.loadSource(data.url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-          video.style.display = 'block';
-          document.getElementById('playerOverlay').style.display = 'block';
-          placeholder.style.display = 'none';
-          document.getElementById('playerState').style.display = 'none';
-          nowPlaying.style.display = 'flex';
-          resetIdleTimer();
-          video.play().catch(() => {});
-        });
-        hls.on(Hls.Events.ERROR, (_, ev) => {
-          if (ev.fatal) {
-            if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-            document.getElementById('playerOverlay').style.display = 'none';
-            tryVariant(ch, variantIdx + 1);
-          }
-        });
-        hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => { buildAudioMenu(); });
-        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, () => { buildAudioMenu(); });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = data.url;
-        video.style.display = 'block';
-        document.getElementById('playerOverlay').style.display = 'block';
-        placeholder.style.display = 'none';
-        document.getElementById('playerState').style.display = 'none';
-        nowPlaying.style.display = 'flex';
-        resetIdleTimer();
-        video.addEventListener('loadedmetadata', () => {
-          if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-          video.play().catch(() => {});
-        }, { once: true });
-        video.addEventListener('error', () => {
-          if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-          document.getElementById('playerOverlay').style.display = 'none';
-          tryVariant(ch, variantIdx + 1);
-        });
-      } else {
-        if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-        setPlayerState('error', 'Tu navegador no soporta HLS', 'Probá con Chrome, Firefox o Edge.');
-      }
-    })
-    .catch(() => {
-      if (failoverTimer) { clearTimeout(failoverTimer); failoverTimer = null; }
-      document.getElementById('playerOverlay').style.display = 'none';
-      tryVariant(ch, variantIdx + 1);
-    });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  initControls();
-  fetch('/api/channels')
-    .then(r => r.json())
-    .then(data => { channels = data; renderChannels(channels); })
-    .catch(() => {
-      document.getElementById('channelList').innerHTML = '<p style="color:#666;padding:16px">Error al cargar canales</p>';
-    });
-});
-</script>
-
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

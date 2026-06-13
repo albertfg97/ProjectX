@@ -2,15 +2,36 @@ import os
 import re
 import json
 import time
+import threading
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 import requests
-from flask import Flask, Response, render_template, request, jsonify
+from flask import Flask, Response, render_template, request, jsonify, session
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
+
+DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
+
+def load_secret_key():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    key_path = os.path.join(DATA_DIR, "secret_key.txt")
+    if os.path.exists(key_path):
+        with open(key_path, "r") as f:
+            return f.read().strip()
+    key = os.urandom(32).hex()
+    with open(key_path, "w") as f:
+        f.write(key)
+    return key
+
+app.secret_key = load_secret_key()
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
 
 ACESTREAM_HOST = os.environ.get("ACESTREAM_HOST", "localhost")
 ACESTREAM_PORT = os.environ.get("ACESTREAM_PORT", "6878")
@@ -25,6 +46,10 @@ FALLBACK_SCRAPE_URL = os.environ.get(
 
 EPG_URL = os.environ.get("EPG_URL", "")
 
+ADMIN_USER = os.environ.get("ADMIN_USER", "")
+ADMIN_PASS = os.environ.get("ADMIN_PASS", "")
+USERS_PATH = os.path.join(DATA_DIR, "users.json")
+
 STATIC_CHANNELS_PATH = os.path.join(os.path.dirname(__file__), "channels.json")
 CACHE_TTL = 86400
 EPG_CACHE_TTL = int(os.environ.get("EPG_CACHE_TTL", "3600"))
@@ -33,6 +58,50 @@ channels_cache = None
 channels_cache_time = 0
 epg_cache = None
 epg_cache_time = 0
+active_viewers = {}
+
+
+def load_users():
+    if not os.path.exists(USERS_PATH):
+        return []
+    try:
+        with open(USERS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def save_users(users):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(USERS_PATH, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user" not in session:
+            return jsonify({"error": "Login required"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user" not in session:
+            return jsonify({"error": "Login required"}), 401
+        if session.get("user") != ADMIN_USER:
+            return jsonify({"error": "Admin required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def cleanup_active_viewers():
+    now = time.time()
+    stale = [u for u, v in active_viewers.items() if now - v.get("last_seen", 0) > 300]
+    for u in stale:
+        del active_viewers[u]
 
 
 def parse_m3u(content):
@@ -99,8 +168,6 @@ def fetch_epg():
         ch_id = ch.get("id", "")
         display_names = [dn.text or "" for dn in ch.findall("display-name")]
         epg_channels[ch_id] = display_names
-
-    now_dt = datetime.now(timezone.utc)
 
     epg_data = {}
     for prog in root.findall("programme"):
@@ -347,12 +414,109 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+
+    if ADMIN_USER and username == ADMIN_USER and password == ADMIN_PASS:
+        session["user"] = username
+        session["is_admin"] = True
+        return jsonify({"status": "ok", "user": username, "is_admin": True})
+
+    users = load_users()
+    for u in users:
+        if u["username"] == username and check_password_hash(u["password"], password):
+            session["user"] = username
+            session["is_admin"] = False
+            return jsonify({"status": "ok", "user": username, "is_admin": False})
+
+    return jsonify({"error": "Credenciales inválidas"}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    user = session.get("user")
+    if user:
+        active_viewers.pop(user, None)
+    session.clear()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/me")
+def api_me():
+    user = session.get("user")
+    if not user:
+        return jsonify({"authenticated": False}), 401
+    return jsonify({
+        "authenticated": True,
+        "user": user,
+        "is_admin": session.get("is_admin", False),
+    })
+
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def admin_get_users():
+    users = load_users()
+    return jsonify([{"username": u["username"]} for u in users])
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@admin_required
+def admin_create_user():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    if not username or not password:
+        return jsonify({"error": "Usuario y contraseña requeridos"}), 400
+    if username == ADMIN_USER:
+        return jsonify({"error": "Ese nombre no está disponible"}), 400
+    users = load_users()
+    for u in users:
+        if u["username"] == username:
+            return jsonify({"error": "El usuario ya existe"}), 400
+    users.append({"username": username, "password": generate_password_hash(password)})
+    save_users(users)
+    return jsonify({"status": "ok", "username": username})
+
+
+@app.route("/api/admin/users/<username>", methods=["DELETE"])
+@admin_required
+def admin_delete_user(username):
+    if username == ADMIN_USER:
+        return jsonify({"error": "No se puede eliminar el admin"}), 400
+    users = load_users()
+    users = [u for u in users if u["username"] != username]
+    save_users(users)
+    active_viewers.pop(username, None)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/admin/active")
+@admin_required
+def admin_active():
+    cleanup_active_viewers()
+    result = []
+    for user, info in list(active_viewers.items()):
+        result.append({
+            "user": user,
+            "channel": info.get("channel", ""),
+            "started_at": info.get("started_at", 0),
+            "last_seen": info.get("last_seen", 0),
+        })
+    return jsonify(result)
+
+
 @app.route("/api/channels")
+@login_required
 def api_channels():
     return jsonify(fetch_channels())
 
 
 @app.route("/api/channels/refresh")
+@login_required
 def api_channels_refresh():
     global channels_cache, channels_cache_time
     channels_cache = None
@@ -361,6 +525,7 @@ def api_channels_refresh():
 
 
 @app.route("/api/epg/now")
+@login_required
 def api_epg_now():
     epg_data = fetch_epg()
     epg_progs = epg_data.get("programmes", {})
@@ -377,6 +542,7 @@ def api_epg_now():
 
 
 @app.route("/api/epg/guide")
+@login_required
 def api_epg_guide():
     channel_id = request.args.get("channel", "")
     if not channel_id:
@@ -417,6 +583,7 @@ def api_epg_guide():
 
 
 @app.route("/api/probe")
+@login_required
 def api_probe():
     hash_val = request.args.get("hash", "").strip()
     if not hash_val:
@@ -437,6 +604,7 @@ def api_probe():
 
 
 @app.route("/api/play")
+@login_required
 def api_play():
     hash_val = request.args.get("hash", "").strip()
     if not hash_val:
@@ -455,6 +623,14 @@ def api_play():
     if not found:
         return jsonify({"error": "Hash not found"}), 404
 
+    user = session.get("user")
+    if user:
+        active_viewers[user] = {
+            "channel": found["channel"]["name"],
+            "started_at": time.time(),
+            "last_seen": time.time(),
+        }
+
     origin = request.headers.get('X-Forwarded-Proto', request.scheme) + '://' + request.headers.get('X-Forwarded-Host', request.host)
     proxy_url = f"{origin}/proxy/ace/manifest.m3u8?id={hash_val}"
     return jsonify({
@@ -465,6 +641,7 @@ def api_play():
 
 
 @app.route("/proxy/<path:path>")
+@login_required
 def proxy(path):
     url = f"{ACESTREAM_BASE}/{path}"
     params = dict(request.args)
@@ -504,6 +681,17 @@ def proxy(path):
         headers=headers,
     )
 
+
+def cleanup_thread():
+    while True:
+        time.sleep(60)
+        try:
+            cleanup_active_viewers()
+        except Exception:
+            pass
+
+
+threading.Thread(target=cleanup_thread, daemon=True).start()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
