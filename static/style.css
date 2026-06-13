@@ -115,6 +115,11 @@ button { font-family: inherit; }
   margin-bottom: 6px;
   padding: 0 6px;
 }
+.channel.dead { opacity: .4; }
+.channel.dead .channel-indicator { background: #991b1b; box-shadow: none; }
+.channel.dead:hover { background: #181824; }
+.channel.dead.active { background: #1c1c30; }
+.channel.dead.active .channel-indicator { background: #991b1b; box-shadow: none; }
 .channel {
   padding: 5px 8px;
   border-radius: 8px;
@@ -125,6 +130,12 @@ button { font-family: inherit; }
 .channel:hover { background: #181824; }
 .channel.active { background: #1c1c30; }
 .channel-row { display: flex; align-items: center; gap: 8px; }
+.channel-fav {
+  font-size: 14px; cursor: pointer; flex-shrink: 0; width: 16px; text-align: center;
+  color: #52526e; transition: color .15s; user-select: none;
+}
+.channel-fav:hover { color: #fbbf24; }
+.channel.active .channel-fav { color: #fbbf24; }
 .channel-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0; }
 .channel-indicator {
   width: 7px; height: 7px;
@@ -376,6 +387,21 @@ button { font-family: inherit; }
 .audio-menu-item.active { color: #a5b4fc; background: #2a2a4e; }
 
 .full-btn { font-size: 16px; }
+.pip-btn { font-size: 14px; }
+.sort-btn {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid #22223a;
+  border-radius: 8px;
+  background: #15151f;
+  color: #72728a;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  margin-bottom: 6px;
+}
+.sort-btn:hover { border-color: #818cf8; color: #c7d2fe; background: #1a1a28; }
 
 .now-playing {
   padding: 10px 20px;

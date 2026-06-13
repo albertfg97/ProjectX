@@ -13,6 +13,27 @@ let failoverTimer = null;
 let idleTimer = null;
 let currentUser = null;
 let isAdmin = false;
+let favorites = new Set(ls.get('favs', []));
+let deadChannels = new Set();
+let sortAlpha = ls.get('sort', false);
+
+function saveFavs() { ls.set('favs', [...favorites]); }
+function toggleFav(chId) {
+  if (favorites.has(chId)) favorites.delete(chId); else favorites.add(chId);
+  saveFavs();
+  renderCurrent();
+}
+function toggleSort() {
+  sortAlpha = !sortAlpha;
+  ls.set('sort', sortAlpha);
+  $('.sort-btn').textContent = sortAlpha ? 'A-Z ✓' : 'A-Z';
+  renderCurrent();
+}
+function renderCurrent() {
+  renderChannels($('#search').value
+    ? channels.filter(c => c.name.toLowerCase().includes($('#search').value.toLowerCase()) || (c.group && c.group.toLowerCase().includes($('#search').value.toLowerCase())))
+    : channels);
+}
 
 function checkAuth() {
   fetch('/api/me')
@@ -189,65 +210,84 @@ function extractQuality(title) {
 }
 
 function renderChannels(chs) {
+  const favIds = new Set([...favorites].filter(id => chs.some(c => c.id === id)));
+  const favChs = chs.filter(c => favIds.has(c.id));
+  const otherChs = chs.filter(c => !favIds.has(c.id));
   const groups = {};
-  chs.forEach(c => {
+  otherChs.forEach(c => {
     const g = c.group || 'Other';
     if (!groups[g]) groups[g] = [];
     groups[g].push(c);
   });
   const sidebar = $('#sidebar');
   sidebar.innerHTML = '';
+  if (favChs.length) {
+    const div = document.createElement('div');
+    div.className = 'group';
+    div.innerHTML = '<div class="group-title">⭐ Favoritos</div>';
+    (sortAlpha ? favChs.sort((a,b) => a.name.localeCompare(b.name)) : favChs).forEach(ch => renderChannelItem(div, ch));
+    sidebar.appendChild(div);
+  }
   Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).forEach(([g, chList]) => {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">' + g + '</div>';
-    chList.forEach(ch => {
-      const item = document.createElement('div');
-      item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
-      item.dataset.id = ch.id;
-      let html = '<div class="channel-row">';
-      if (ch.logo) html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
-      html += '<div class="channel-indicator"></div>';
-      html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
-      if (ch.epg_now) {
-        html += '<div class="channel-epg has-epg" data-epg="1">Ahora: ' + ch.epg_now.title + '</div>';
-      } else {
-        html += '<div class="channel-epg">Sin guía</div>';
-      }
-      if (ch.variants && ch.variants.length > 1) {
-        html += '<div class="channel-variants">';
-        ch.variants.forEach((v, idx) => {
-          const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
-          html += '<span class="variant-chip' + (active ? ' active' : '') + '" data-idx="' + idx + '">' + extractQuality(v.title) + '</span>';
-        });
-        html += '</div>';
-      }
-      html += '</div></div>';
-      item.innerHTML = html;
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.variant-chip')) return;
-        if (e.target.closest('.channel-epg[data-epg]')) return;
-        closeSidebar();
-        playHash(ch.id, ch.variants[0].hash);
-      });
-      item.querySelectorAll('.variant-chip').forEach((chip, idx) => {
-        chip.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeSidebar();
-          playHash(ch.id, ch.variants[parseInt(chip.dataset.idx)].hash);
-        });
-      });
-      const epgEl = item.querySelector('.channel-epg[data-epg]');
-      if (epgEl) {
-        epgEl.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openEPG(ch.id);
-        });
-      }
-      div.appendChild(item);
-    });
+    (sortAlpha ? chList.sort((a,b) => a.name.localeCompare(b.name)) : chList).forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   });
+}
+function renderChannelItem(container, ch) {
+  const item = document.createElement('div');
+  const isDead = deadChannels.has(ch.id);
+  item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '') + (isDead ? ' dead' : '');
+  item.dataset.id = ch.id;
+  const isFav = favorites.has(ch.id);
+  let html = '<div class="channel-row">';
+  html += '<span class="channel-fav" data-fav="1">' + (isFav ? '★' : '☆') + '</span>';
+  if (ch.logo) html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
+  html += '<div class="channel-indicator"></div>';
+  html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
+  if (ch.epg_now) {
+    html += '<div class="channel-epg has-epg" data-epg="1">Ahora: ' + ch.epg_now.title + '</div>';
+  } else {
+    html += '<div class="channel-epg">Sin guía</div>';
+  }
+  if (ch.variants && ch.variants.length > 1) {
+    html += '<div class="channel-variants">';
+    ch.variants.forEach((v, idx) => {
+      const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
+      html += '<span class="variant-chip' + (active ? ' active' : '') + '" data-idx="' + idx + '">' + extractQuality(v.title) + '</span>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  item.innerHTML = html;
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.variant-chip')) return;
+    if (e.target.closest('.channel-epg[data-epg]')) return;
+    if (e.target.closest('.channel-fav')) return;
+    closeSidebar();
+    playHash(ch.id, ch.variants[0].hash);
+  });
+  item.querySelector('.channel-fav').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFav(ch.id);
+  });
+  item.querySelectorAll('.variant-chip').forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSidebar();
+      playHash(ch.id, ch.variants[parseInt(chip.dataset.idx)].hash);
+    });
+  });
+  const epgEl = item.querySelector('.channel-epg[data-epg]');
+  if (epgEl) {
+    epgEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEPG(ch.id);
+    });
+  }
+  container.appendChild(item);
 }
 
 function closeSidebar() {
@@ -276,6 +316,7 @@ $('.refresh-btn').addEventListener('click', function() {
     .then(r => r.json())
     .then(data => {
       channels = data;
+      deadChannels.clear();
       renderChannels(channels);
       this.innerHTML = '↻ Actualizar canales';
       this.disabled = false;
@@ -327,10 +368,13 @@ function playHash(channelId, hash) {
 
 function tryVariant(ch, variantIdx) {
   if (variantIdx >= ch.variants.length) {
+    deadChannels.add(ch.id);
+    renderCurrent();
     setPlayerState('error', 'No se pudo cargar',
       'Probamos todas las calidades sin éxito. El canal puede estar caído.');
     return;
   }
+  deadChannels.delete(ch.id);
 
   const video = $('#player-video');
   const hash = ch.variants[variantIdx].hash;
@@ -553,6 +597,58 @@ function initControls() {
     else pw.requestFullscreen();
   });
 
+  $('.pip-btn').addEventListener('click', () => {
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture();
+    } else if (document.pictureInPictureEnabled) {
+      v.requestPictureInPicture().catch(() => {});
+    }
+  });
+  v.addEventListener('enterpictureinpicture', () => {
+    $('.pip-btn').textContent = '⛶';
+  });
+  v.addEventListener('leavepictureinpicture', () => {
+    $('.pip-btn').textContent = '📌';
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        if (v.paused) v.play().catch(() => {}); else v.pause();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        v.currentTime = Math.max(0, v.currentTime - 5);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        v.currentTime = Math.min(v.duration || 0, v.currentTime + 5);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        v.volume = Math.min(1, v.volume + 0.1);
+        updateVolumeUI();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        v.volume = Math.max(0, v.volume - 0.1);
+        updateVolumeUI();
+        break;
+      case 'm':
+      case 'M':
+        v.muted = !v.muted;
+        updateVolumeUI();
+        break;
+      case 'f':
+      case 'F':
+        if (document.fullscreenElement) document.exitFullscreen();
+        else pw.requestFullscreen();
+        break;
+    }
+  });
+
   pw.addEventListener('mousemove', resetIdleTimer);
   pw.addEventListener('touchstart', resetIdleTimer);
 }
@@ -640,8 +736,6 @@ function initApp() {
             if (epgNow[ch.id]) ch.epg_now = epgNow[ch.id];
           });
           renderChannels(channels);
-          const first = $('#sidebar .channel');
-          if (first) first.click();
         })
         .catch(() => { renderChannels(channels); });
     })
