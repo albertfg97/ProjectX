@@ -570,7 +570,11 @@ function initControls() {
     if (!v.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const target = ((e.clientX - rect.left) / rect.width) * v.duration;
-    v.currentTime = Math.min(target, v.duration - 1);
+    if (target < v.currentTime) {
+      v.currentTime = Math.max(0, target);
+    } else {
+      v.currentTime = v.duration - 1;
+    }
   });
 
   const volumeRange = $('.volume-slider input');
@@ -588,13 +592,13 @@ function initControls() {
   $('.live-btn').addEventListener('click', () => {
     if (hls && hls.liveSyncPosition) {
       v.currentTime = hls.liveSyncPosition;
-    } else {
-      v.currentTime = v.duration || 1e10;
+    } else if (v.duration && isFinite(v.duration)) {
+      v.currentTime = v.duration - 1;
     }
   });
   function updateLiveBtn() {
     const liveBtn = $('.live-btn');
-    if (!v.duration) return;
+    if (!v.duration || !isFinite(v.duration)) return;
     const atLive = v.duration - v.currentTime < 5;
     liveBtn.classList.toggle('at-live', atLive);
   }
@@ -634,7 +638,7 @@ function initControls() {
         break;
       case 'ArrowRight':
         e.preventDefault();
-        v.currentTime = Math.min(v.duration - 1 || 0, v.currentTime + 5);
+        if (v.duration) v.currentTime = v.duration - 1;
         break;
       case 'ArrowUp':
         e.preventDefault();
