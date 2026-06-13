@@ -59,7 +59,7 @@
     .header input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.15); }
     .header input::placeholder { color: #52526e; }
 
-    .app-layout {
+    .app-content {
       display: flex;
       height: calc(100vh - 55px);
     }
@@ -502,6 +502,185 @@
       font-size: 13px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .header-right .user-name {
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .admin-btn, .logout-btn {
+      background: none;
+      border: 1px solid #22223a;
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      color: #72728a;
+    }
+    .admin-btn:hover { border-color: #818cf8; color: #c7d2fe; background: #1a1a28; }
+    .logout-btn:hover { border-color: #f87171; color: #fca5a5; background: #1a1a28; }
+
+    .login-overlay {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      background: #0b0b0e;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-modal {
+      width: 100%;
+      max-width: 340px;
+      padding: 32px;
+      text-align: center;
+    }
+    .login-modal h2 {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #818cf8, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+    .login-modal p {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+    .login-modal input {
+      width: 100%;
+      background: #1a1a24;
+      border: 1px solid #2a2a3a;
+      color: #e2e8f0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      margin-bottom: 10px;
+    }
+    .login-modal input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.15); }
+    .login-modal input::placeholder { color: #52526e; }
+    .login-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #4f46e5;
+      color: #e0e7ff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+      margin-top: 4px;
+    }
+    .login-btn:hover { background: #6366f1; }
+    .login-btn:disabled { opacity: .6; cursor: wait; }
+    .login-error {
+      font-size: 13px;
+      color: #f87171;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .admin-section {
+      margin-bottom: 20px;
+    }
+    .admin-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #52526e;
+      margin-bottom: 10px;
+    }
+    .admin-user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1a1a26;
+      font-size: 13px;
+    }
+    .admin-user-row:last-child { border-bottom: none; }
+    .admin-del-btn {
+      background: none;
+      border: 1px solid #22223a;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: #72728a;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .admin-del-btn:hover { border-color: #f87171; color: #fca5a5; }
+    .admin-create-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .admin-create-row input {
+      flex: 1;
+      background: #1a1a24;
+      border: 1px solid #2a2a3a;
+      color: #e2e8f0;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .admin-create-row input:focus { border-color: #818cf8; }
+    .admin-create-row button {
+      border: 1px solid #22c55e;
+      border-radius: 8px;
+      padding: 7px 14px;
+      background: none;
+      color: #22c55e;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .admin-create-row button:hover { background: #22c55e; color: #0b0b0e; }
+
+    .admin-active-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1a1a26;
+      font-size: 12px;
+    }
+    .admin-active-item:last-child { border-bottom: none; }
+    .admin-active-item .aa-user { color: #a5b4fc; font-weight: 500; }
+    .admin-active-item .aa-channel { color: #e2e8f0; flex: 1; text-align: center; }
+    .admin-active-item .aa-time { color: #6b7280; }
+    .admin-empty {
+      color: #52526e;
+      font-size: 12px;
+      font-style: italic;
+    }
+    .admin-msg {
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+    .admin-msg.ok { color: #22c55e; display: block; }
+    .admin-msg.err { color: #f87171; display: block; }
+
+    .app-content.hidden { display: none; }
+
     @media (max-width: 768px) {
       .menu-btn { display: block; }
       .header input { width: 140px; font-size: 13px; }
@@ -530,9 +709,14 @@
   <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
   <h1>Acestream Web</h1>
   <input type="text" id="search" placeholder="Buscar canales..." oninput="filterChannels()">
+  <div class="header-right">
+    <button class="admin-btn" id="adminBtn" onclick="openAdminModal()" style="display:none">Admin</button>
+    <span class="user-name" id="userName"></span>
+    <button class="logout-btn" onclick="logout()">Salir</button>
+  </div>
 </div>
 
-<div class="app-layout">
+<div class="app-content hidden" id="appContent">
   <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
   <div class="sidebar-outer" id="sidebarOuter">
     <div class="sidebar" id="channelList"></div>
@@ -587,6 +771,17 @@
   </div>
 </div>
 
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-modal">
+    <h2>Acestream Web</h2>
+    <p>Inicia sesión para continuar</p>
+    <input type="text" id="loginUser" placeholder="Usuario" autocomplete="username">
+    <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+    <button class="login-btn" id="loginBtn" onclick="login()">Iniciar sesión</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="epgModal">
   <div class="modal">
     <div class="modal-header">
@@ -600,6 +795,34 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="adminModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <span class="modal-title">Panel de Administración</span>
+      <button class="modal-close" onclick="closeAdminModal()">✕</button>
+    </div>
+    <div class="modal-body" id="adminBody">
+      <div class="admin-section">
+        <h3>Crear usuario</h3>
+        <div class="admin-create-row">
+          <input type="text" id="newUsername" placeholder="Usuario">
+          <input type="password" id="newPassword" placeholder="Contraseña">
+          <button onclick="createUser()">Crear</button>
+        </div>
+        <div class="admin-msg" id="adminCreateMsg"></div>
+      </div>
+      <div class="admin-section">
+        <h3>Usuarios registrados</h3>
+        <div id="usersList"><span class="admin-empty">Cargando...</span></div>
+      </div>
+      <div class="admin-section">
+        <h3>Conectados ahora</h3>
+        <div id="activeList"><span class="admin-empty">Cargando...</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 let channels = [];
 let hls = null;
@@ -607,6 +830,194 @@ let currentHash = null;
 let currentChannel = null;
 let failoverTimer = null;
 let idleTimer = null;
+let currentUser = null;
+let isAdmin = false;
+
+// ---- auth ----
+
+function checkAuth() {
+  fetch('/api/me')
+    .then(r => {
+      if (r.status === 401) {
+        document.getElementById('loginOverlay').classList.remove('hidden');
+        document.getElementById('appContent').classList.add('hidden');
+        return null;
+      }
+      return r.json();
+    })
+    .then(data => {
+      if (!data) return;
+      currentUser = data.user;
+      isAdmin = data.is_admin;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('appContent').classList.remove('hidden');
+      document.getElementById('userName').textContent = currentUser;
+      if (isAdmin) {
+        document.getElementById('adminBtn').style.display = '';
+      }
+      initApp();
+    })
+    .catch(() => {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('appContent').classList.add('hidden');
+    });
+}
+
+function login() {
+  const btn = document.getElementById('loginBtn');
+  const error = document.getElementById('loginError');
+  btn.disabled = true;
+  btn.textContent = 'Iniciando sesión...';
+  error.style.display = 'none';
+
+  fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      username: document.getElementById('loginUser').value,
+      password: document.getElementById('loginPass').value,
+    })
+  })
+    .then(r => r.json().then(d => ({status: r.status, body: d})))
+    .then(({status, body}) => {
+      if (status === 200) {
+        checkAuth();
+      } else {
+        error.textContent = body.error || 'Error al iniciar sesión';
+        error.style.display = 'block';
+      }
+    })
+    .catch(() => {
+      error.textContent = 'Error de conexión';
+      error.style.display = 'block';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = 'Iniciar sesión';
+    });
+}
+
+function logout() {
+  fetch('/api/logout', {method: 'POST'})
+    .then(() => { location.reload(); })
+    .catch(() => { location.reload(); });
+}
+
+document.getElementById('loginUser').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('loginPass').focus();
+});
+document.getElementById('loginPass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') login();
+});
+
+// ---- admin modal ----
+
+function openAdminModal() {
+  document.getElementById('adminModal').classList.add('open');
+  loadUsers();
+  loadActive();
+}
+function closeAdminModal() {
+  document.getElementById('adminModal').classList.remove('open');
+}
+document.getElementById('adminModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('adminModal')) closeAdminModal();
+});
+
+function loadUsers() {
+  const container = document.getElementById('usersList');
+  fetch('/api/admin/users')
+    .then(r => r.json())
+    .then(users => {
+      if (!users.length) {
+        container.innerHTML = '<span class="admin-empty">No hay usuarios creados</span>';
+        return;
+      }
+      container.innerHTML = users.map(u =>
+        '<div class="admin-user-row">' +
+          '<span>' + u.username + '</span>' +
+          '<button class="admin-del-btn" onclick="deleteUser(\'' + u.username + '\')">Eliminar</button>' +
+        '</div>'
+      ).join('');
+    })
+    .catch(() => {
+      container.innerHTML = '<span class="admin-empty">Error al cargar</span>';
+    });
+}
+
+function createUser() {
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value;
+  const msg = document.getElementById('adminCreateMsg');
+  msg.className = 'admin-msg';
+  if (!username || !password) {
+    msg.textContent = 'Completa todos los campos';
+    msg.className = 'admin-msg err';
+    return;
+  }
+  fetch('/api/admin/users', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username, password}),
+  })
+    .then(r => r.json().then(d => ({status: r.status, body: d})))
+    .then(({status, body}) => {
+      if (status === 200) {
+        msg.textContent = 'Usuario creado correctamente';
+        msg.className = 'admin-msg ok';
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newPassword').value = '';
+        loadUsers();
+      } else {
+        msg.textContent = body.error || 'Error al crear';
+        msg.className = 'admin-msg err';
+      }
+    })
+    .catch(() => {
+      msg.textContent = 'Error de conexión';
+      msg.className = 'admin-msg err';
+    });
+}
+
+function deleteUser(username) {
+  if (!confirm('¿Eliminar usuario "' + username + '"?')) return;
+  fetch('/api/admin/users/' + encodeURIComponent(username), {method: 'DELETE'})
+    .then(r => r.json().then(d => ({status: r.status, body: d})))
+    .then(({status, body}) => {
+      if (status === 200) {
+        loadUsers();
+      } else {
+        alert(body.error || 'Error al eliminar');
+      }
+    })
+    .catch(() => { alert('Error de conexión'); });
+}
+
+function loadActive() {
+  const container = document.getElementById('activeList');
+  fetch('/api/admin/active')
+    .then(r => r.json())
+    .then(list => {
+      if (!list.length) {
+        container.innerHTML = '<span class="admin-empty">No hay usuarios conectados</span>';
+        return;
+      }
+      container.innerHTML = list.map(v => {
+        const ago = Math.floor((Date.now() / 1000 - v.last_seen) / 60);
+        const timeStr = ago < 1 ? 'Ahora' : 'Hace ' + ago + ' min';
+        return '<div class="admin-active-item">' +
+          '<span class="aa-user">' + v.user + '</span>' +
+          '<span class="aa-channel">' + v.channel + '</span>' +
+          '<span class="aa-time">' + timeStr + '</span>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(() => {
+      container.innerHTML = '<span class="admin-empty">Error al cargar</span>';
+    });
+}
+
+// ---- sidebar ----
 
 function toggleSidebar() {
   document.getElementById('sidebarOuter').classList.toggle('open');
@@ -743,7 +1154,7 @@ function initControls() {
     }
   };
   document.addEventListener('fullscreenchange', () => {
-    document.getElementById('fullBtn').textContent = document.fullscreenElement ? '⛶' : '⛶';
+    const btn = document.getElementById('fullBtn');
   });
 
   pw.addEventListener('mousemove', resetIdleTimer);
@@ -824,14 +1235,14 @@ function openEPG(channelId) {
       data.programmes.forEach(p => {
         const cls = p.is_now ? 'epg-entry is-now' : 'epg-entry';
         const timeStr = formatEPGTime(p.start) + ' - ' + shortEPGTime(p.stop);
-        const nowLabel = p.is_now ? ' <span style="color:#22c55e;font-size:10px">● EN VIVO</span>' : '';
+        const nowLabel = p.is_now ? ' <span style="color:#22c55e;font-size:10px">&#9679; EN VIVO</span>' : '';
         html += '<div class="' + cls + '">';
         html += '<div class="epg-time">' + timeStr + nowLabel + '</div>';
         html += '<div class="epg-title">' + (p.title || 'Sin título') + '</div>';
         if (p.desc) {
           const descId = 'epgDesc' + data.programmes.indexOf(p);
           html += '<div class="epg-desc" id="' + descId + '">' + p.desc + '</div>';
-          html += '<button class="epg-desc-toggle" onclick="document.getElementById(\'' + descId + '\').classList.toggle(\'open\');this.textContent=this.textContent==\'▼ Más\'?\'▲ Menos\':\'▼ Más\'">▼ Más</button>';
+          html += '<button class="epg-desc-toggle" onclick="document.getElementById(\'' + descId + '\').classList.toggle(\'open\');this.textContent=this.textContent==\'&#9660; Más\'?\'&#9650; Menos\':\'&#9660; Más\'">&#9660; Más</button>';
         }
         html += '</div>';
       });
@@ -865,7 +1276,7 @@ function renderChannels(chs) {
   Object.entries(groups).forEach(([groupName, chList]) => {
     const div = document.createElement('div');
     div.className = 'group';
-    div.innerHTML = `<div class="group-title">${groupName}</div>`;
+    div.innerHTML = '<div class="group-title">' + groupName + '</div>';
     chList.forEach(ch => {
       const item = document.createElement('div');
       item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
@@ -873,25 +1284,25 @@ function renderChannels(chs) {
 
       let html = '<div class="channel-row">';
       if (ch.logo) {
-        html += `<img class="channel-logo" src="${ch.logo}" alt="" onerror="this.style.display='none'">`;
+        html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
       }
-      html += `<div class="channel-indicator"></div>`;
-      html += `<div class="channel-info"><div class="channel-name">${ch.name}</div>`;
+      html += '<div class="channel-indicator"></div>';
+      html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
       if (ch.epg_now) {
-        html += `<div class="channel-epg has-epg" onclick="event.stopPropagation();openEPG('${ch.id}')">Ahora: ${ch.epg_now.title}</div>`;
+        html += '<div class="channel-epg has-epg" onclick="event.stopPropagation();openEPG(\'' + ch.id + '\')">Ahora: ' + ch.epg_now.title + '</div>';
       } else {
-        html += `<div class="channel-epg">Sin guía</div>`;
+        html += '<div class="channel-epg">Sin guía</div>';
       }
       if (ch.variants.length > 1) {
-        html += `<div class="channel-variants">`;
+        html += '<div class="channel-variants">';
         ch.variants.forEach((v) => {
           const active = currentChannel && currentChannel.id === ch.id && currentHash === v.hash;
           const label = (v.title.match(/\d+p|4K|HD|FHD|UHD/i) || ['HD'])[0];
-          html += `<span class="variant-chip${active ? ' active' : ''}" data-hash="${v.hash}" onclick="event.stopPropagation();playHash('${ch.id}','${v.hash}')">${label}</span>`;
+          html += '<span class="variant-chip' + (active ? ' active' : '') + '" data-hash="' + v.hash + '" onclick="event.stopPropagation();playHash(\'' + ch.id + '\',\'' + v.hash + '\')">' + label + '</span>';
         });
-        html += `</div>`;
+        html += '</div>';
       }
-      html += `</div></div>`;
+      html += '</div></div>';
       item.innerHTML = html;
       item.onclick = () => {
         closeSidebar();
@@ -915,17 +1326,17 @@ function filterChannels() {
 function refreshChannels() {
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
-  btn.innerHTML = '⟳ Actualizando...';
+  btn.innerHTML = '&#10227; Actualizando...';
   fetch('/api/channels/refresh')
     .then(r => r.json())
     .then(data => {
       channels = data;
       renderChannels(channels);
-      btn.innerHTML = '↻ Actualizar canales';
+      btn.innerHTML = '&#8635; Actualizar canales';
       btn.disabled = false;
     })
     .catch(() => {
-      btn.innerHTML = '↻ Error al actualizar';
+      btn.innerHTML = '&#8635; Error al actualizar';
       btn.disabled = false;
     });
 }
@@ -970,7 +1381,7 @@ function tryVariant(ch, variantIdx) {
 
   currentHash = hash;
 
-  setPlayerState('loading', `Probando ${qual}...`);
+  setPlayerState('loading', 'Probando ' + qual + '...');
 
   if (failoverTimer) clearTimeout(failoverTimer);
   failoverTimer = setTimeout(() => {
@@ -978,7 +1389,7 @@ function tryVariant(ch, variantIdx) {
     tryVariant(ch, variantIdx + 1);
   }, 20000);
 
-  fetch(`/api/probe?hash=${hash}`)
+  fetch('/api/probe?hash=' + hash)
     .then(r => r.json())
     .then(probe => {
       if (probe.status !== 'ok') {
@@ -1003,7 +1414,7 @@ function startPlayback(ch, variantIdx) {
   const variant = ch.variants[variantIdx];
   const qual = (variant.title.match(/\d+p|4K|UHD/i) || ['HD'])[0];
 
-  setPlayerState('loading', `Conectando... ${qual}`);
+  setPlayerState('loading', 'Conectando... ' + qual);
 
   if (failoverTimer) clearTimeout(failoverTimer);
   failoverTimer = setTimeout(() => {
@@ -1011,7 +1422,7 @@ function startPlayback(ch, variantIdx) {
     tryVariant(ch, variantIdx + 1);
   }, 20000);
 
-  fetch(`/api/play?hash=${hash}`)
+  fetch('/api/play?hash=' + hash)
     .then(r => r.json())
     .then(data => {
       renderChannels(channels);
@@ -1073,7 +1484,7 @@ function startPlayback(ch, variantIdx) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   initControls();
   fetch('/api/channels')
     .then(r => r.json())
@@ -1081,7 +1492,9 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(() => {
       document.getElementById('channelList').innerHTML = '<p style="color:#666;padding:16px">Error al cargar canales</p>';
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', checkAuth);
 </script>
 
 </body>
