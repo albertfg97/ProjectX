@@ -134,6 +134,7 @@ button { font-family: inherit; }
   font-size: 14px; cursor: pointer; flex-shrink: 0; width: 16px; text-align: center;
   color: #52526e; transition: color .15s; user-select: none;
 }
+.channel-fav.is-fav { color: #fbbf24; }
 .channel-fav:hover { color: #fbbf24; }
 .channel.active .channel-fav { color: #fbbf24; }
 .channel-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: contain; flex-shrink: 0; }
@@ -388,20 +389,16 @@ button { font-family: inherit; }
 
 .full-btn { font-size: 16px; }
 .pip-btn { font-size: 14px; }
-.sort-btn {
-  width: 100%;
-  padding: 7px;
-  border: 1px solid #22223a;
-  border-radius: 8px;
-  background: #15151f;
-  color: #72728a;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all .15s;
-  margin-bottom: 6px;
+.live-btn {
+  font-size: 10px;
+  font-weight: 700;
+  width: auto;
+  padding: 0 6px;
+  color: #f87171;
+  text-transform: uppercase;
+  letter-spacing: .03em;
 }
-.sort-btn:hover { border-color: #818cf8; color: #c7d2fe; background: #1a1a28; }
+.live-btn.at-live { color: #52526e; }
 
 .now-playing {
   padding: 10px 20px;

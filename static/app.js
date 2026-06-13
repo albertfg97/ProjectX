@@ -15,18 +15,11 @@ let currentUser = null;
 let isAdmin = false;
 let favorites = new Set(ls.get('favs', []));
 let deadChannels = new Set();
-let sortAlpha = ls.get('sort', false);
 
 function saveFavs() { ls.set('favs', [...favorites]); }
 function toggleFav(chId) {
   if (favorites.has(chId)) favorites.delete(chId); else favorites.add(chId);
   saveFavs();
-  renderCurrent();
-}
-function toggleSort() {
-  sortAlpha = !sortAlpha;
-  ls.set('sort', sortAlpha);
-  $('.sort-btn').textContent = sortAlpha ? 'A-Z ✓' : 'A-Z';
   renderCurrent();
 }
 function renderCurrent() {
@@ -225,14 +218,14 @@ function renderChannels(chs) {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">⭐ Favoritos</div>';
-    (sortAlpha ? favChs.sort((a,b) => a.name.localeCompare(b.name)) : favChs).forEach(ch => renderChannelItem(div, ch));
+    favChs.forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   }
   Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).forEach(([g, chList]) => {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">' + g + '</div>';
-    (sortAlpha ? chList.sort((a,b) => a.name.localeCompare(b.name)) : chList).forEach(ch => renderChannelItem(div, ch));
+    chList.forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   });
 }
@@ -243,7 +236,7 @@ function renderChannelItem(container, ch) {
   item.dataset.id = ch.id;
   const isFav = favorites.has(ch.id);
   let html = '<div class="channel-row">';
-  html += '<span class="channel-fav" data-fav="1">' + (isFav ? '★' : '☆') + '</span>';
+  html += '<span class="channel-fav' + (isFav ? ' is-fav' : '') + '" data-fav="1">' + (isFav ? '★' : '☆') + '</span>';
   if (ch.logo) html += '<img class="channel-logo" src="' + ch.logo + '" alt="" onerror="this.style.display=\'none\'">';
   html += '<div class="channel-indicator"></div>';
   html += '<div class="channel-info"><div class="channel-name">' + ch.name + '</div>';
@@ -591,6 +584,23 @@ function initControls() {
     v.volume = val;
     updateVolumeUI();
   });
+
+  $('.live-btn').addEventListener('click', () => {
+    if (hls && hls.liveSyncPosition) {
+      video.currentTime = hls.liveSyncPosition;
+    } else {
+      video.currentTime = video.duration || 1e10;
+    }
+  });
+  function updateLiveBtn() {
+    const liveBtn = $('.live-btn');
+    if (!video.duration) return;
+    const atLive = video.duration - video.currentTime < 5;
+    liveBtn.classList.toggle('at-live', atLive);
+  }
+  v.addEventListener('timeupdate', updateLiveBtn);
+  v.addEventListener('seeked', updateLiveBtn);
+  v.addEventListener('loadedmetadata', updateLiveBtn);
 
   $('.full-btn').addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen();
