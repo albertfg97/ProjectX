@@ -14,12 +14,25 @@ let idleTimer = null;
 let currentUser = null;
 let isAdmin = false;
 let favorites = new Set(ls.get('favs', []));
+let deadChannels = new Set();
+let sortAlpha = ls.get('sort', false);
 
 function saveFavs() { ls.set('favs', [...favorites]); }
 function toggleFav(chId) {
   if (favorites.has(chId)) favorites.delete(chId); else favorites.add(chId);
   saveFavs();
-  renderChannels($('#search').value ? channels.filter(c => c.name.toLowerCase().includes($('#search').value.toLowerCase()) || (c.group && c.group.toLowerCase().includes($('#search').value.toLowerCase()))) : channels);
+  renderCurrent();
+}
+function toggleSort() {
+  sortAlpha = !sortAlpha;
+  ls.set('sort', sortAlpha);
+  $('.sort-btn').textContent = sortAlpha ? 'A-Z ✓' : 'A-Z';
+  renderCurrent();
+}
+function renderCurrent() {
+  renderChannels($('#search').value
+    ? channels.filter(c => c.name.toLowerCase().includes($('#search').value.toLowerCase()) || (c.group && c.group.toLowerCase().includes($('#search').value.toLowerCase())))
+    : channels);
 }
 
 function checkAuth() {
@@ -212,20 +225,21 @@ function renderChannels(chs) {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">⭐ Favoritos</div>';
-    favChs.forEach(ch => renderChannelItem(div, ch));
+    (sortAlpha ? favChs.sort((a,b) => a.name.localeCompare(b.name)) : favChs).forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   }
   Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).forEach(([g, chList]) => {
     const div = document.createElement('div');
     div.className = 'group';
     div.innerHTML = '<div class="group-title">' + g + '</div>';
-    chList.forEach(ch => renderChannelItem(div, ch));
+    (sortAlpha ? chList.sort((a,b) => a.name.localeCompare(b.name)) : chList).forEach(ch => renderChannelItem(div, ch));
     sidebar.appendChild(div);
   });
 }
 function renderChannelItem(container, ch) {
   const item = document.createElement('div');
-  item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '');
+  const isDead = deadChannels.has(ch.id);
+  item.className = 'channel' + (currentChannel && currentChannel.id === ch.id ? ' active' : '') + (isDead ? ' dead' : '');
   item.dataset.id = ch.id;
   const isFav = favorites.has(ch.id);
   let html = '<div class="channel-row">';
@@ -302,6 +316,7 @@ $('.refresh-btn').addEventListener('click', function() {
     .then(r => r.json())
     .then(data => {
       channels = data;
+      deadChannels.clear();
       renderChannels(channels);
       this.innerHTML = '↻ Actualizar canales';
       this.disabled = false;
@@ -353,10 +368,13 @@ function playHash(channelId, hash) {
 
 function tryVariant(ch, variantIdx) {
   if (variantIdx >= ch.variants.length) {
+    deadChannels.add(ch.id);
+    renderCurrent();
     setPlayerState('error', 'No se pudo cargar',
       'Probamos todas las calidades sin éxito. El canal puede estar caído.');
     return;
   }
+  deadChannels.delete(ch.id);
 
   const video = $('#player-video');
   const hash = ch.variants[variantIdx].hash;
@@ -577,6 +595,58 @@ function initControls() {
   $('.full-btn').addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else pw.requestFullscreen();
+  });
+
+  $('.pip-btn').addEventListener('click', () => {
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture();
+    } else if (document.pictureInPictureEnabled) {
+      v.requestPictureInPicture().catch(() => {});
+    }
+  });
+  v.addEventListener('enterpictureinpicture', () => {
+    $('.pip-btn').textContent = '⛶';
+  });
+  v.addEventListener('leavepictureinpicture', () => {
+    $('.pip-btn').textContent = '📌';
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        if (v.paused) v.play().catch(() => {}); else v.pause();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        v.currentTime = Math.max(0, v.currentTime - 5);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        v.currentTime = Math.min(v.duration || 0, v.currentTime + 5);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        v.volume = Math.min(1, v.volume + 0.1);
+        updateVolumeUI();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        v.volume = Math.max(0, v.volume - 0.1);
+        updateVolumeUI();
+        break;
+      case 'm':
+      case 'M':
+        v.muted = !v.muted;
+        updateVolumeUI();
+        break;
+      case 'f':
+      case 'F':
+        if (document.fullscreenElement) document.exitFullscreen();
+        else pw.requestFullscreen();
+        break;
+    }
   });
 
   pw.addEventListener('mousemove', resetIdleTimer);
