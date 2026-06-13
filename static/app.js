@@ -587,9 +587,9 @@ function initControls() {
 
   $('.live-btn').addEventListener('click', () => {
     if (hls && hls.liveSyncPosition) {
-      video.currentTime = hls.liveSyncPosition;
+      v.currentTime = hls.liveSyncPosition;
     } else {
-      video.currentTime = video.duration || 1e10;
+      v.currentTime = v.duration || 1e10;
     }
   });
   function updateLiveBtn() {

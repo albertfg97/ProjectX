@@ -395,7 +395,7 @@ button { font-family: inherit; }
   width: auto;
   padding: 2px 8px;
   border: 1.5px solid #f87171;
-  border-radius: 6px;
+  border-radius: 20px;
   color: #f87171;
   text-transform: uppercase;
   letter-spacing: .03em;
