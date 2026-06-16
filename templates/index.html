@@ -64,7 +64,7 @@
             <span class="time-display time-current">0:00</span>
             <span class="time-sep">/</span>
             <span class="time-display time-duration">0:00</span>
-            <button class="ctrl-btn live-btn">● LIVE</button>
+            <button class="ctrl-btn live-btn"><span class="live-icon">●</span><span class="live-text">LIVE</span></button>
             <div class="progress-wrap">
               <div class="progress-track">
                 <div class="progress-fill"></div>
@@ -77,11 +77,18 @@
                 <input type="range" min="0" max="1" step="0.05" value="1">
               </div>
             </div>
-            <div class="audio-btn">
-              <button class="ctrl-btn small">🎵<span class="audio-label">1</span></button>
-              <div class="audio-menu"></div>
+            <div class="gear-wrap">
+              <button class="ctrl-btn gear-btn">⚙</button>
+              <div class="gear-menu">
+                <div class="gear-item gear-pip" data-action="pip">📺 PiP</div>
+                <div class="gear-quality-section" style="display:none">
+                  <div class="gear-item gear-quality-header">📺 Calidad</div>
+                  <div class="gear-quality-list"></div>
+                </div>
+                <div class="gear-item gear-audio-header">🎵 <span class="gear-audio-label">Audio: 1</span></div>
+                <div class="gear-audio-list"></div>
+              </div>
             </div>
-            <button class="ctrl-btn pip-btn">📌</button>
             <button class="ctrl-btn full-btn">⛶</button>
           </div>
         </div>
