@@ -664,8 +664,11 @@ function initControls() {
 
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
+    resetIdleTimer();
     switch (e.key) {
       case ' ':
+      case 'Enter':
+      case 'MediaPlayPause':
         e.preventDefault();
         if (v.paused) v.play().catch(() => {}); else v.pause();
         break;
@@ -696,6 +699,9 @@ function initControls() {
       case 'F':
         if (document.fullscreenElement) document.exitFullscreen();
         else pw.requestFullscreen();
+        break;
+      case 'Escape':
+        if (document.fullscreenElement) document.exitFullscreen();
         break;
     }
   });
