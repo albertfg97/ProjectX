@@ -116,64 +116,88 @@ $('#admin-panel').addEventListener('click', (e) => {
 
 function loadAdminUsers() {
   const container = $('#admin-users');
-  container.innerHTML = '<h3>Usuarios</h3>';
   fetch('/api/admin/users')
     .then(r => r.json())
     .then(users => {
+      let html = '<h3>Usuarios</h3>';
       if (!users.length) {
-        container.innerHTML += '<div class="admin-empty">No hay usuarios creados</div>';
+        html += '<div class="admin-empty">No hay usuarios creados</div>';
       } else {
         users.forEach(u => {
           if (u.username === 'admin') {
-            container.innerHTML += '<div class="admin-user-row"><span>' + u.username + '</span><span style="color:#52526e;font-size:11px;">built-in</span></div>';
+            html += '<div class="admin-user-row"><span>' + u.username + '</span><span style="color:#52526e;font-size:11px;">built-in</span></div>';
           } else {
-            container.innerHTML += '<div class="admin-user-row"><span>' + u.username + '</span><button class="admin-del-btn" data-user="' + u.username + '">Delete</button></div>';
+            html += '<div class="admin-user-row"><span>' + u.username + '</span><button class="admin-del-btn" data-user="' + u.username + '">Delete</button></div>';
           }
         });
-        container.querySelectorAll('.admin-del-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            fetch('/api/admin/users/' + encodeURIComponent(btn.dataset.user), {method: 'DELETE'})
-              .then(r => r.json())
-              .then(() => { loadAdminUsers(); })
-              .catch(() => {});
-          });
-        });
       }
-      addCreateForm(container);
+      html += '<div class="admin-create-row">' +
+        '<input id="new-user-input" placeholder="Usuario">' +
+        '<input id="new-pass-input" type="password" placeholder="Contraseña">' +
+        '<button id="create-user-btn">Crear</button></div>';
+      container.innerHTML = html;
+
+      container.querySelectorAll('.admin-del-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          fetch('/api/admin/users/' + encodeURIComponent(btn.dataset.user), {method: 'DELETE'})
+            .then(r => r.json())
+            .then(() => { loadAdminUsers(); })
+            .catch(() => {});
+        });
+      });
+
+      $('#create-user-btn').addEventListener('click', () => {
+        const u = $('#new-user-input').value.trim();
+        const p = $('#new-pass-input').value;
+        const msg = $('#admin-msg');
+        if (!u || !p) { msg.textContent = 'Completa todos los campos'; msg.className = 'admin-msg err'; return; }
+        fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username: u, password: p})
+        })
+          .then(r => r.json().then(d => ({status: r.status, body: d})))
+          .then(({status, body}) => {
+            if (status === 200) {
+              msg.textContent = 'Usuario creado'; msg.className = 'admin-msg ok';
+              $('#new-user-input').value = ''; $('#new-pass-input').value = '';
+              loadAdminUsers();
+            } else {
+              msg.textContent = body.error || 'Error'; msg.className = 'admin-msg err';
+            }
+          })
+          .catch(() => { msg.textContent = 'Error'; msg.className = 'admin-msg err'; });
+      });
     })
     .catch(() => {
-      container.innerHTML += '<div class="admin-empty">Error al cargar</div>';
-      addCreateForm(container);
+      container.innerHTML = '<h3>Usuarios</h3><div class="admin-empty">Error al cargar</div>' +
+        '<div class="admin-create-row">' +
+        '<input id="new-user-input" placeholder="Usuario">' +
+        '<input id="new-pass-input" type="password" placeholder="Contraseña">' +
+        '<button id="create-user-btn">Crear</button></div>';
+      $('#create-user-btn').addEventListener('click', () => {
+        const u = $('#new-user-input').value.trim();
+        const p = $('#new-pass-input').value;
+        const msg = $('#admin-msg');
+        if (!u || !p) { msg.textContent = 'Completa todos los campos'; msg.className = 'admin-msg err'; return; }
+        fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username: u, password: p})
+        })
+          .then(r => r.json().then(d => ({status: r.status, body: d})))
+          .then(({status, body}) => {
+            if (status === 200) {
+              msg.textContent = 'Usuario creado'; msg.className = 'admin-msg ok';
+              $('#new-user-input').value = ''; $('#new-pass-input').value = '';
+              loadAdminUsers();
+            } else {
+              msg.textContent = body.error || 'Error'; msg.className = 'admin-msg err';
+            }
+          })
+          .catch(() => { msg.textContent = 'Error'; msg.className = 'admin-msg err'; });
+      });
     });
-}
-
-function addCreateForm(container) {
-  container.innerHTML += '<div class="admin-create-row">' +
-    '<input id="new-user-input" placeholder="Usuario">' +
-    '<input id="new-pass-input" type="password" placeholder="Contraseña">' +
-    '<button id="create-user-btn">Crear</button></div>';
-  $('#create-user-btn').addEventListener('click', () => {
-    const u = $('#new-user-input').value.trim();
-    const p = $('#new-pass-input').value;
-    const msg = $('#admin-msg');
-    if (!u || !p) { msg.textContent = 'Completa todos los campos'; msg.className = 'admin-msg err'; return; }
-    fetch('/api/admin/users', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username: u, password: p})
-    })
-      .then(r => r.json().then(d => ({status: r.status, body: d})))
-      .then(({status, body}) => {
-        if (status === 200) {
-          msg.textContent = 'Usuario creado'; msg.className = 'admin-msg ok';
-          $('#new-user-input').value = ''; $('#new-pass-input').value = '';
-          loadAdminUsers();
-        } else {
-          msg.textContent = body.error || 'Error'; msg.className = 'admin-msg err';
-        }
-      })
-      .catch(() => { msg.textContent = 'Error'; msg.className = 'admin-msg err'; });
-  });
 }
 
 function loadAdminActive() {
