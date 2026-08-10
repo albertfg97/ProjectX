@@ -54,6 +54,9 @@ STATIC_CHANNELS_PATH = os.path.join(os.path.dirname(__file__), "channels.json")
 CACHE_TTL = 86400
 EPG_CACHE_TTL = int(os.environ.get("EPG_CACHE_TTL", "3600"))
 
+IPTV_TOKEN = os.environ.get("IPTV_TOKEN", "")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+
 channels_cache = None
 channels_cache_time = 0
 epg_cache = None
@@ -95,6 +98,16 @@ def admin_required(f):
             return jsonify({"error": "Admin required"}), 403
         return f(*args, **kwargs)
     return decorated
+
+
+def iptv_auth_ok():
+    if not IPTV_TOKEN:
+        return False
+    return request.args.get("token", "") == IPTV_TOKEN
+
+
+def authed():
+    return "user" in session or iptv_auth_ok()
 
 
 def cleanup_active_viewers():
@@ -582,6 +595,96 @@ def api_epg_guide():
     })
 
 
+def m3u_attr(s):
+    return (s or "").replace("\\", "\\\\").replace('"', '\\"').replace("\r", " ").replace("\n", " ")
+
+
+def iptv_base_url():
+    if PUBLIC_BASE_URL:
+        return PUBLIC_BASE_URL
+    return (request.headers.get('X-Forwarded-Proto', request.scheme)
+            + '://' + request.headers.get('X-Forwarded-Host', request.host))
+
+
+@app.route("/iptv/playlist.m3u")
+def iptv_playlist():
+    if not authed():
+        return Response("Unauthorized", status=401)
+
+    channels = fetch_channels()
+    base = iptv_base_url()
+    token_qs = f"&token={IPTV_TOKEN}" if IPTV_TOKEN else ""
+
+    lines = ["#EXTM3U"]
+    chno = 1
+    for ch in channels:
+        if not ch.get("variants"):
+            continue
+        variant = ch["variants"][0]
+        name = m3u_attr(ch.get("name", "Unknown"))
+        tvg_id = m3u_attr(ch.get("epg_channel_id", ""))
+        group = m3u_attr(ch.get("group", "Otros"))
+        logo = m3u_attr(ch.get("logo", "") or variant.get("logo", ""))
+        extinf = f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{name}" tvg-chno="{chno}"'
+        if logo:
+            extinf += f' tvg-logo="{logo}"'
+        extinf += f' group-title="{group}",{name}'
+        url = f"{base}/proxy/ace/manifest.m3u8?id={variant['hash']}{token_qs}"
+        lines.append(extinf)
+        lines.append(url)
+        chno += 1
+
+    return Response("\n".join(lines) + "\n", content_type="audio/x-mpegurl")
+
+
+@app.route("/iptv/epg.xml")
+def iptv_epg():
+    if not authed():
+        return Response("Unauthorized", status=401)
+
+    epg_data = fetch_epg()
+    epg_progs = epg_data.get("programmes", {})
+    channels = fetch_channels()
+
+    root = ET.Element("tv")
+    seen = set()
+    for ch in channels:
+        ch_id = ch.get("epg_channel_id", "")
+        if not ch_id or ch_id in seen:
+            continue
+        seen.add(ch_id)
+        el = ET.SubElement(root, "channel", {"id": ch_id})
+        ET.SubElement(el, "display-name").text = ch.get("name", ch_id)
+        icon = ch.get("logo", "")
+        if icon:
+            ET.SubElement(el, "icon", {"src": icon})
+        for p in sorted(epg_progs.get(ch_id, []), key=lambda x: x["start_ts"]):
+            prog = ET.SubElement(root, "programme", {
+                "start": p["start"],
+                "stop": p["stop"],
+                "channel": ch_id,
+            })
+            ET.SubElement(prog, "title").text = p.get("title", "")
+            if p.get("desc"):
+                ET.SubElement(prog, "desc").text = p.get("desc", "")
+
+    xml_str = ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    return Response(xml_str, content_type="application/xml")
+
+
+@app.route("/api/iptv/info")
+@admin_required
+def api_iptv_info():
+    if not IPTV_TOKEN:
+        return jsonify({"enabled": False})
+    base = iptv_base_url()
+    return jsonify({
+        "enabled": True,
+        "playlist": f"{base}/iptv/playlist.m3u?token={IPTV_TOKEN}",
+        "epg": f"{base}/iptv/epg.xml?token={IPTV_TOKEN}",
+    })
+
+
 @app.route("/api/probe")
 @login_required
 def api_probe():
@@ -641,10 +744,12 @@ def api_play():
 
 
 @app.route("/proxy/<path:path>")
-@login_required
 def proxy(path):
+    if not authed():
+        return Response("Unauthorized", status=401)
+
     url = f"{ACESTREAM_BASE}/{path}"
-    params = dict(request.args)
+    params = {k: v for k, v in request.args.items() if k != "token"}
 
     try:
         resp = requests.get(url, params=params, stream=True, timeout=30)
@@ -670,6 +775,12 @@ def proxy(path):
             r'/proxy/ace/\1',
             text
         )
+        if IPTV_TOKEN:
+            text = re.sub(
+                r'/proxy/[^\s"\'<>]+',
+                lambda m: m.group(0) + ("&" if "?" in m.group(0) else "?") + "token=" + IPTV_TOKEN,
+                text,
+            )
         return Response(
             text, status=resp.status_code, headers=headers,
             content_type=resp.headers.get("Content-Type")

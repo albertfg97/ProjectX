@@ -106,6 +106,7 @@ $('#admin-btn').addEventListener('click', () => {
   $('#admin-panel').classList.add('open');
   loadAdminUsers();
   loadAdminActive();
+  loadAdminIptv();
 });
 $('#admin-panel .modal-close').addEventListener('click', () => {
   $('#admin-panel').classList.remove('open');
@@ -171,6 +172,26 @@ function loadAdminUsers() {
         .catch(() => { msg.textContent = 'Error'; msg.className = 'admin-msg err'; });
     });
   }, 50);
+}
+
+function loadAdminIptv() {
+  const container = $('#admin-iptv');
+  container.innerHTML = '<h3>IPTV / Plex</h3>';
+  fetch('/api/iptv/info')
+    .then(r => r.json().then(d => ({status: r.status, body: d})))
+    .then(({status, body}) => {
+      if (status === 200 && body.enabled) {
+        container.innerHTML += '<div class="admin-iptv-item"><span class="iptv-label">M3U (XTeVe)</span>' +
+          '<input class="iptv-url" readonly value="' + esc(body.playlist) + '" onclick="this.select()"></div>' +
+          '<div class="admin-iptv-item"><span class="iptv-label">XMLTV (XTeVe)</span>' +
+          '<input class="iptv-url" readonly value="' + esc(body.epg) + '" onclick="this.select()"></div>';
+      } else {
+        container.innerHTML += '<div class="admin-empty">Configura la env var IPTV_TOKEN para activar Plex</div>';
+      }
+    })
+    .catch(() => {
+      container.innerHTML += '<div class="admin-empty">Error al cargar</div>';
+    });
 }
 
 function loadAdminActive() {
